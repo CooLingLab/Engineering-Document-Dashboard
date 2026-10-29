@@ -12,7 +12,10 @@ export function makeSnapshot(overrides: Partial<DocumentSnapshot> = {}): Documen
 }
 
 export function makeConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
-  return { ...createProject(makeSnapshot().repository, templates[0]), ...overrides };
+  const config = createProject(makeSnapshot().repository, templates[0]);
+  config.graph = { nodes: config.graph.nodes.filter((node) => node.id === 'requirements'), edges: [] };
+  config.documentRules.expected = config.documentRules.expected.filter((document) => document.nodeId === 'requirements');
+  return { ...config, ...overrides };
 }
 
 export function makeAnalysis(overrides: Partial<AnalysisRecord> = {}): AnalysisRecord {
