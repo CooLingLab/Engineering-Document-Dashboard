@@ -23,6 +23,15 @@ describe('GitHub repository address', () => {
 });
 
 describe('GitHub reader', () => {
+  it('calls browser fetch with the global receiver required by native implementations', async () => {
+    const fetcher: typeof fetch = async function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return json(repoPayload);
+    };
+    const reader = new GitHubReader({ fetcher, credentials: new MemoryCredentials(), credentialSlot: 'target' });
+    await expect(reader.getRepository({ owner: 'acme', name: 'demo' })).resolves.toEqual(repo);
+  });
+
   it('reads public data without a token and keeps subsequent requests pinned to one commit', async () => {
     const requests: { url: URL; init: RequestInit }[] = [];
     const fetcher: typeof fetch = vi.fn(async (input, init) => {

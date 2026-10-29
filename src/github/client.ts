@@ -41,7 +41,7 @@ export class GitHubReader {
     if (token) headers.set('Authorization', `Bearer ${token}`);
     let response: Response;
     try {
-      response = await this.#options.fetcher(url.toString(), { method: 'GET', headers, signal });
+      response = await this.#options.fetcher.call(globalThis, url.toString(), { method: 'GET', headers, signal });
     } catch (error) {
       if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
       throw new GitHubError('network', '无法连接 GitHub，请检查网络。');

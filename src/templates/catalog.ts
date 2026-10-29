@@ -4,7 +4,7 @@ type Stage = { id: string; title: string; file: string; guidance: StageGuidance;
 
 function makeTemplate(id: string, title: string, description: string, stages: Stage[], loop = false): TemplateSnapshot {
   const nodes = stages.map((stage, order) => ({
-    id: stage.id, title: stage.title, order, position: { x: 40 + order * 260, y: 120 },
+    id: stage.id, title: stage.title, order, position: { x: 40 + order * 200, y: 120 },
     guidance: stage.guidance, promptIds: [`${stage.id}-prompt`],
   }));
   const edges = nodes.slice(1).map((node, index) => ({
