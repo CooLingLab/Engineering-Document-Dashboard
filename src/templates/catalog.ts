@@ -71,7 +71,24 @@ const iterative: Stage[] = [
   { id: 'iteration-review', title: '回顾与下一轮', file: '04-iteration-review.md', guidance: { why: '回顾帮助你根据证据选择下一轮。', action: '整理本轮结果、问题与后续方向。', checks: ['将已知事实与下一步设想分开。'] }, prompt: '请帮助我整理本轮实际结果、遗留问题、经验和下一轮候选方向；只依据我提供的信息，以 Markdown 输出。' },
 ];
 
+
+// Canonical lifecycle. Stable stage IDs and order are part of the DevFlow v3 contract.
+const devflowStages: Stage[] = [
+  { id: "idea", title: "Idea → Brainstorm", file: "01-idea.md", guidance: { why: "明确真实问题与产品价值", action: "明确目标用户、问题、非目标和成功信号", checks: ["问题和目标用户已写清"] }, prompt: "结合用户输入梳理产品愿景与问题定义；区分事实和假设。" },
+  { id: "domain", title: "Strategic DDD", file: "02-domain.md", guidance: { why: "统一语言和业务边界", action: "列出领域概念、上下文边界与关键业务规则", checks: ["核心概念和边界可被验证"] }, prompt: "以轻量战略DDD梳理领域术语、边界与规则，不做过度建模。" },
+  { id: "concept", title: "Concept Prototype → Validation", file: "03-concept-validation.md", guidance: { why: "验证核心产品假设", action: "制作最小可交互概念原型并记录观察结果", checks: ["有真实反馈或者明确未验证"] }, prompt: "制定轻量HTML概念原型及验证方案，不伪造用户反馈。" },
+  { id: "roadmap", title: "Roadmap", file: "04-roadmap.md", guidance: { why: "确定MVP与版本范围", action: "排列MVP、下一版本和以后再做的功能", checks: ["功能优先级和取舍理由清晰"] }, prompt: "将产品需求拆分MVP与后续版本并说明优先级和非目标。" },
+  { id: "ui", title: "UI Prototype", file: "05-ui-prototype.md", guidance: { why: "验证当前版本交互体验", action: "制作可交互高保真UI原型", checks: ["关键使用路径已检查"] }, prompt: "基于当前版本范围提出可交互UI原型的设计与验收要点。" },
+  { id: "spec", title: "Spec → Architecture / ADR → Plan", file: "06-spec-plan.md", guidance: { why: "形成可执行的开发契约", action: "写清验收标准、接口、ADR、任务依赖", checks: ["规格可检查，关键决策可追溯"] }, prompt: "从已确认的原型和需求生成Spec、架构决策记录与任务计划。" },
+  { id: "build", title: "Harness + Agent Loop", file: "07-implementation.md", guidance: { why: "通过循环实现和验证", action: "编码、测试、审查、修复并保存结果", checks: ["测试结果有真实执行证据"] }, prompt: "按任务计划实现并运行测试、复查、修复，记录失败和待办。" },
+  { id: "release", title: "Human Acceptance → Release", file: "08-release.md", guidance: { why: "由人验收并发布", action: "人工确认验收门槛、发布与反馈迭代", checks: ["有人工批准与发布记录"] }, prompt: "协助整理人工验收清单和发布说明，不自行声称已获批准。" },
+];
+
+export const DEVFLOW_TEMPLATE_ID = 'devflow-v3';
+export const devflowTemplate = makeTemplate(DEVFLOW_TEMPLATE_ID, 'AI 开发标准流程 V3', '固定八阶段主干；支持按项目阶段标记跳过、配置文档与验证进度。', devflowStages);
+
 export const templates: readonly TemplateSnapshot[] = [
+  devflowTemplate,
   makeTemplate('general-app', '通用应用开发', '适合从想法开始，了解开发一个应用的基本过程。', general),
   makeTemplate('mvp', '原型 / MVP 验证', '适合先用最小范围验证一个想法。', mvp),
   makeTemplate('iterative', '迭代开发', '适合已有项目按轮次持续改进。', iterative, true),
