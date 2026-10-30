@@ -80,3 +80,11 @@
   .document-preview-content { padding: 10px 15px 22px; }
   .document-preview-panel { scroll-margin-top: 10px; }
 }
+
+
+.stage-association-add { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; border-top: 1px solid #edf0f5; margin-top: 15px; padding-top: 14px; }
+.stage-association-add label { display: grid; gap: 6px; flex: 1; min-width: 180px; color: #78879d; font-size: 11px; }
+.stage-association-add select { min-width: 0; width: 100%; border: 1px solid #dfe5ef; border-radius: 8px; background: #fff; color: #485975; font: inherit; padding: 10px; }
+.stage-association-add button { min-height: 38px; }
+.workspace-stage-details .document-item .text-danger { flex: none; }
+@media (max-width: 700px) { .stage-association-add label, .stage-association-add button { width: 100%; } .stage-association-add label { min-width: 0; } }
