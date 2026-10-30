@@ -3,7 +3,7 @@ import type { DocumentIndex } from '../documents/match';
 import { useState } from 'react';
 import { adviceBasisKey, analysisInputKey, deriveNodeView, setDocumentChoice, setManualStatus } from '../workflow/status';
 import { githubFileUrl, MarkdownReader } from './MarkdownReader';
-import { statusLabels } from './StageNode';
+import { statusLabels } from '../workflow/statusLabels';
 
 export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void; onSelectDocument?: (path: string) => void; showEmbeddedReader?: boolean };
 
