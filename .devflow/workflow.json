@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.1",
+  "id": "devflow-v3",
+  "name": "AI Development Lifecycle V3",
+  "phases": [
+    {
+      "id": "idea",
+      "name": "Idea → Brainstorm",
+      "outputs": [
+        "docs/development/idea.md"
+      ]
+    },
+    {
+      "id": "domain",
+      "name": "Lightweight Strategic DDD",
+      "outputs": [
+        "docs/development/domain-model.md"
+      ]
+    },
+    {
+      "id": "concept",
+      "name": "Concept Prototype → Validation",
+      "outputs": [
+        "docs/development/concept-validation.md"
+      ]
+    },
+    {
+      "id": "roadmap",
+      "name": "Roadmap",
+      "outputs": [
+        "docs/development/roadmap.md"
+      ]
+    },
+    {
+      "id": "ui",
+      "name": "UI Prototype",
+      "outputs": [
+        "docs/development/ui-prototype.md"
+      ]
+    },
+    {
+      "id": "spec",
+      "name": "Spec → Architecture / ADR → Plan",
+      "outputs": [
+        "docs/development/spec.md",
+        "docs/development/architecture.md"
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Harness + Agent Loop",
+      "outputs": [
+        "docs/development/implementation.md",
+        "docs/development/testing.md"
+      ]
+    },
+    {
+      "id": "release",
+      "name": "Human Acceptance → Release",
+      "outputs": [
+        "docs/development/release.md"
+      ]
+    }
+  ],
+  "rules": {
+    "scope": "per-feature",
+    "allow_revisit": true,
+    "human_approval_required_for": [
+      "concept",
+      "release"
+    ],
+    "completion_requires_evidence": true
+  }
+}
