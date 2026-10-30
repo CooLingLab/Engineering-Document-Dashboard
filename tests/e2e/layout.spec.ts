@@ -33,6 +33,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
       await page.locator('.mobile-add-form').getByLabel('新环节名称').fill(longTitle);
       await page.locator('.mobile-add-form').getByRole('button', { name: '添加', exact: true }).click();
       await expect(page.locator('.mobile-stage-list').getByText(longTitle, { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: '完成 / 关闭' }).click();
       await page.getByRole('button', { name: '流程图预览' }).click();
       await expect(page.locator('.mobile-graph-preview .react-flow__node').filter({ hasText: longTitle })).toHaveCount(1);
     } else {
