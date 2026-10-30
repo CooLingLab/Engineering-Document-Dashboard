@@ -27,9 +27,19 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     if (process.env.CAPTURE_VISUAL) await page.screenshot({ path: `/private/tmp/dashboard-${browserName}-${viewport.width}.png`, fullPage: true });
     await page.getByRole('button', { name: '编辑流程' }).click();
     const longTitle = '这是一个用于检查中文长标题换行和开发流程显示的测试环节';
-    await page.getByLabel('新环节名称').fill(longTitle);
-    await page.getByRole('button', { name: '添加环节' }).click();
-    await expect(page.locator('.react-flow__node').filter({ hasText: longTitle })).toHaveCount(1);
+    if (viewport.width < 700) {
+      // The phone editor uses a list and a tap-to-add form instead of the desktop canvas form.
+      await page.getByRole('button', { name: '＋ 添加新环节' }).click();
+      await page.getByLabel('新环节名称').fill(longTitle);
+      await page.getByRole('button', { name: '添加', exact: true }).click();
+      await expect(page.getByText(longTitle, { exact: true }).first()).toBeVisible();
+      await page.getByRole('button', { name: '流程图预览' }).click();
+      await expect(page.locator('.mobile-graph-preview .react-flow__node').filter({ hasText: longTitle })).toHaveCount(1);
+    } else {
+      await page.getByLabel('新环节名称').fill(longTitle);
+      await page.getByRole('button', { name: '添加环节' }).click();
+      await expect(page.locator('.react-flow__node').filter({ hasText: longTitle })).toHaveCount(1);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   });
 }
