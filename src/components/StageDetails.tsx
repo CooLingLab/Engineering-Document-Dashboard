@@ -1,11 +1,13 @@
-import type { DocumentSnapshot, ProjectConfig } from '../domain/project';
+import { getBranchState, type DocumentChoice, type DocumentSnapshot, type ManualStatus, type ProjectConfig } from '../domain/project';
 import type { DocumentIndex } from '../documents/match';
 import { useState } from 'react';
+import { deriveNodeView, setDocumentChoice, setManualStatus } from '../workflow/status';
 import { githubFileUrl, MarkdownReader } from './MarkdownReader';
+import { statusLabels } from './StageNode';
 
-export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean };
+export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; onChangeConfig?: (config: ProjectConfig) => void };
 
-export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode }: StageDetailsProps) {
+export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, onChangeConfig }: StageDetailsProps) {
   const [selectedPath, setSelectedPath] = useState<string>();
   const [copyMessage, setCopyMessage] = useState('');
   const node = config.graph.nodes.find((item) => item.id === nodeId);
@@ -15,6 +17,10 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
   const path = selectedPath && availablePaths.includes(selectedPath) ? selectedPath : availablePaths[0];
   const document = snapshot.documents.find((item) => item.path === path);
   const prompt = node.promptIds.map((id) => config.template?.prompts[id]).find(Boolean);
+  const branch = snapshot.ref?.name;
+  const state = getBranchState(config, branch ?? '');
+  const view = deriveNodeView(config, snapshot, nodeId, false);
+  const manual = Object.hasOwn(state.manualStatuses, nodeId) ? state.manualStatuses[nodeId] : '';
 
   async function copyPrompt() {
     if (!prompt) return;
@@ -27,7 +33,8 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
 
   return (
     <section className="stage-details" role="region" aria-label={`${node.title}详情`}>
-      <div className="detail-heading"><div><span className="section-kicker">STAGE DETAILS</span><h2>{node.title}</h2></div><span className="status-chip">未判断</span></div>
+      <div className="detail-heading"><div><span className="section-kicker">STAGE DETAILS</span><h2>{node.title}</h2></div><span className="status-chip">{statusLabels[view.status]}{view.source === 'manual' ? ' · 手动' : ''}</span></div>
+      <label className="manual-status">手动状态<select aria-label="手动状态" value={manual} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setManualStatus(config, branch, nodeId, (event.target.value || null) as ManualStatus | null)); }}><option value="">未标记</option><option value="not-started">未开始</option><option value="in-progress">进行中</option><option value="done">已完成</option><option value="deferred">暂缓</option></select></label>
       {beginnerMode && <div className="guidance-card"><strong>✦ 为什么要做这一步？</strong><p>{node.guidance.why}</p><p>{node.guidance.action}</p><ul>{node.guidance.checks.map((check) => <li key={check}>{check}</li>)}</ul></div>}
       <div className="detail-grid">
         <div className="document-panel"><div className="panel-heading"><h3>相关文档</h3><span>{matches.length} 项建议</span></div>
@@ -35,6 +42,7 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
           {matches.map((match) => <div className="document-item" key={match.documentId}>
             {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
             <small>{match.kind === 'missing' ? '建议补充' : match.kind === 'unavailable' ? '无法读取' : match.kind === 'ambiguous' ? '有多个候选' : match.contentCheck === 'heading-only' ? '只有标题' : match.contentCheck === 'empty' ? '空文档' : '已找到'}</small>
+            <select aria-label={`文档取舍：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`} value={Object.hasOwn(state.documentChoices, match.documentId) ? state.documentChoices[match.documentId] : 'needed'} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setDocumentChoice(config, branch, match.documentId, event.target.value as DocumentChoice)); }}><option value="needed">需要</option><option value="later">稍后再说</option><option value="not-needed">不需要</option></select>
           </div>)}
           {document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
         </div>

@@ -11,6 +11,8 @@ import { GitHubError, GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
 import { parseRepositoryInput } from '../github/repository';
 import { templates } from '../templates/catalog';
+import { deriveNodeView } from '../workflow/status';
+import { recommendNext } from '../workflow/recommend';
 import './app.css';
 import './components.css';
 
@@ -129,7 +131,9 @@ export default function App() {
   }
 
   const documentIndex = useMemo(() => config && snapshot ? indexDocuments(config, snapshot) : null, [config, snapshot]);
-  const nodeViews: Record<string, NodeView> = Object.fromEntries((config?.graph.nodes ?? []).map((node) => [node.id, { status: 'unknown', source: 'none', analysis: 'absent' }]));
+  const nodeViews: Record<string, NodeView> = Object.fromEntries((config?.graph.nodes ?? []).map((node) => [node.id,
+    config && snapshot ? deriveNodeView(config, snapshot, node.id, false) : { status: 'unknown', source: 'none', analysis: 'absent' }]));
+  const recommendation = config && snapshot && documentIndex ? recommendNext(config, snapshot, documentIndex, false) : null;
 
   return <div className="app-shell">
     <aside className="sidebar" aria-label="主导航">
@@ -149,7 +153,7 @@ export default function App() {
         {config && snapshot && <details className="directory-settings"><summary>文档目录：{config.documentRules.root} · 修改文档目录</summary><form onSubmit={(event) => { event.preventDefault(); changeDirectory(); }}><label>文档目录<input value={documentRoot} onChange={(event) => setDocumentRoot(event.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>应用目录</button></form></details>}
         {snapshot?.issues.map((issue, index) => <p key={`${issue.path}-${index}`} className="scan-issue" role="status">{issue.message}</p>)}
         <section className="route-intro" aria-labelledby="route-title"><div><div className="section-kicker">YOUR DEVELOPMENT JOURNEY</div><h2 id="route-title">你的开发路线</h2><p>不必一次完成所有事情。先看全貌，再从眼前的一步开始。</p></div>{config ? <button type="button" className="secondary-button" onClick={() => setEditing(!editing)}>{editing ? '完成编辑' : '编辑流程'}</button> : <span className="recommended">推荐路线</span>}</section>
-        {config && snapshot && documentIndex ? <><div className="next-step"><span>✦</span><div><strong>先了解当前环节</strong><p>点击路线中的环节，查看文档和下一步的提示。</p></div></div><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} onGraphChange={editing && !busy ? (graph) => void applyConfigChange({ ...config, graph }) : undefined} documentIndex={documentIndex} />{editing && <fieldset className="editing-container" disabled={busy}><WorkflowEditor config={config} selectedNodeId={selectedNodeId} documentIndex={documentIndex} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} onUndo={undo} canUndo={history.length > 0} /><TemplatePicker config={config} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} /></fieldset>}{selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} />}</> : <div className="route-preview" aria-label="通用应用开发流程">{templates[0].graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
+        {config && snapshot && documentIndex ? <><div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} onGraphChange={editing && !busy ? (graph) => void applyConfigChange({ ...config, graph }) : undefined} documentIndex={documentIndex} />{editing && <fieldset className="editing-container" disabled={busy}><WorkflowEditor config={config} selectedNodeId={selectedNodeId} documentIndex={documentIndex} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} onUndo={undo} canUndo={history.length > 0} /><TemplatePicker config={config} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} /></fieldset>}{selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} onChangeConfig={(next) => void applyConfigChange(next)} />}</> : <div className="route-preview" aria-label="通用应用开发流程">{templates[0].graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
         <div className="footer-note">✳ 你的文档留在原来的仓库中，我们只读取它们。</div>
       </div>
     </main>

@@ -48,4 +48,13 @@ describe('safe read-only document display', () => {
     expect(await screen.findByText(/请手动复制/)).toBeInTheDocument();
     expect(screen.getByText(config.template!.prompts['requirements-prompt'])).toBeInTheDocument();
   });
+
+  it('lets the user mark a stage and defer a missing document', () => {
+    const config = makeConfig(); const snapshot = makeSnapshot(); const onChange = vi.fn();
+    render(<StageDetails config={config} snapshot={snapshot} nodeId="requirements" documentIndex={indexDocuments(config, snapshot)} beginnerMode onChangeConfig={onChange} />);
+    fireEvent.change(screen.getByLabelText('手动状态'), { target: { value: 'done' } });
+    expect(onChange.mock.calls[0][0].branches.main.manualStatuses.requirements).toBe('done');
+    fireEvent.change(screen.getByLabelText('文档取舍：02-requirements.md'), { target: { value: 'later' } });
+    expect(onChange.mock.calls[1][0].branches.main.documentChoices['requirements-doc']).toBe('later');
+  });
 });
