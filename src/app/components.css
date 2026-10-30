@@ -167,3 +167,7 @@
   .fixed-stage-item { min-height: 60px; align-content: center; flex-wrap: nowrap; }
   .fixed-stage-title { width: auto; flex: 1; }
 }
+
+.document-item { flex-wrap: wrap; }
+.document-item select { max-width: 100%; min-width: 96px; }
+@media (max-width: 700px) { .document-item { align-items: flex-start; } .document-item select { flex: 1; min-width: 120px; } }
