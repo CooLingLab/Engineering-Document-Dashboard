@@ -7,7 +7,7 @@ import { applyGraphCommand } from '../../src/workflow/graph';
 import { makeConfig, makeSnapshot } from '../fixtures';
 
 const another: WorkflowNode = {
-  id: 'prototype', title: 'UI Prototype', order: 1, position: { x: 280, y: 120 },
+  id: 'prototype', title: 'UI Prototype', order: 2, position: { x: 280, y: 120 },
   guidance: { why: '验证界面', action: '检查原型', checks: [] }, promptIds: [],
 };
 function mount(config: ProjectConfig = makeConfig()) {
