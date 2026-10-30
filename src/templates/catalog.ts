@@ -88,8 +88,8 @@ export const DEVFLOW_TEMPLATE_ID = 'devflow-v3';
 export const devflowTemplate = makeTemplate(DEVFLOW_TEMPLATE_ID, 'AI 开发标准流程 V3', '固定八阶段主干；支持按项目阶段标记跳过、配置文档与验证进度。', devflowStages);
 
 export const templates: readonly TemplateSnapshot[] = [
-  devflowTemplate,
   makeTemplate('general-app', '通用应用开发', '适合从想法开始，了解开发一个应用的基本过程。', general),
   makeTemplate('mvp', '原型 / MVP 验证', '适合先用最小范围验证一个想法。', mvp),
   makeTemplate('iterative', '迭代开发', '适合已有项目按轮次持续改进。', iterative, true),
+  devflowTemplate,
 ];
