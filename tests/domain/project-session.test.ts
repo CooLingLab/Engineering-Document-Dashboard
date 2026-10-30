@@ -104,4 +104,22 @@ describe('project session', () => {
     act(() => result.current.markSaved(earlier));
     expect(result.current.state.dirty).toBe(true);
   });
+
+  it('reuses unchanged documents after a code-only commit and replaces changed blobs', async () => {
+    const { reader } = fakeReader();
+    let sha = 'blob-1';
+    let commit = 'commit-1';
+    vi.mocked(reader.resolveRef).mockImplementation(async (_repo, branch) => ({ name: branch, commitSha: commit }));
+    vi.mocked(reader.listDirectory).mockImplementation(async () => [{ type: 'file', path: 'docs/development/02-requirements.md', size: 3, sha }]);
+    (reader as unknown as { readFile: unknown }).readFile = vi.fn(async () => ({ path: 'docs/development/02-requirements.md', blobSha: sha, content: 'abc', size: 3 }));
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    const original = result.current.state.snapshot!.documents[0];
+    commit = 'commit-2';
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.state.snapshot!.documents[0]).toBe(original);
+    sha = 'blob-2';
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.state.snapshot!.documents[0]).not.toBe(original);
+  });
 });

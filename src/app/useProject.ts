@@ -61,13 +61,21 @@ export function useProject(reader: GitHubReader) {
     }
   }
 
-  async function load(branch: string | null, config: ProjectConfig, replaceConfig = false) {
+  async function load(branch: string | null, config: ProjectConfig, replaceConfig = false, throwOnError = false) {
     const repositoryId = config.repository.id;
     const originalConfig = current.current.config;
     const pending = begin(repositoryId, branch);
     try {
-      const snapshot = branch ? await loadDocumentSnapshot(reader, config.repository, branch, config.documentRules.root, pending.controller.signal)
+      let snapshot = branch ? await loadDocumentSnapshot(reader, config.repository, branch, config.documentRules.root, pending.controller.signal)
         : emptySnapshot(config.repository, config.documentRules.root);
+      const previous = current.current.snapshot;
+      if (previous && previous.repository.id === repositoryId && previous.ref?.name === branch && previous.root === snapshot.root) {
+        const documents = new Map(previous.documents.map((document) => [document.path, document]));
+        snapshot = { ...snapshot, documents: snapshot.documents.map((document) => {
+          const old = documents.get(document.path);
+          return old && old.blobSha === document.blobSha && old.size === document.size && old.content === document.content ? old : document;
+        }) };
+      }
       if (replaceConfig && current.current.config !== originalConfig && pending.generation === generation.current) {
         dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, error: '读取期间流程已更改，请重新应用文档目录。' });
         return false;
@@ -77,14 +85,15 @@ export function useProject(reader: GitHubReader) {
     } catch (error) {
       if (!pending.controller.signal.aborted) dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch,
         error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
+      if (throwOnError) throw error;
       return false;
     }
   }
   async function selectBranch(branch: string) {
     if (current.current.config && branch) await load(branch, current.current.config);
   }
-  async function refresh() {
-    if (current.current.config) await load(current.current.selectedBranch, current.current.config);
+  async function refresh(throwOnError = false) {
+    if (current.current.config) await load(current.current.selectedBranch, current.current.config, false, throwOnError);
   }
   async function applyConfig(config: ProjectConfig) {
     if (current.current.config?.repository.id !== config.repository.id) return false;

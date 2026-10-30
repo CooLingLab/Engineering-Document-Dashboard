@@ -56,7 +56,8 @@ export function SyncPanel({ config, dirty, credentials, fetcher, onLoaded, onSav
       const input = parseRepositoryInput(address);
       credentials.set('config', token || undefined);
       const reader = new GitHubReader({ fetcher, credentials, credentialSlot: 'config' });
-      const repository = await reader.getRepository(input);
+      let repository;
+      try { repository = await reader.getRepository(input); } finally { reader.dispose(); }
       if (repository.id === config.repository.id) throw new Error('请使用独立的配置仓库，不能写入目标项目。');
       const gateway = new ConfigRepositoryGateway({ repository, branch: repository.defaultBranch }, { fetcher, credentials });
       const info = await gateway.inspect();

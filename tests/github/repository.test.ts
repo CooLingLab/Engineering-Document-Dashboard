@@ -23,6 +23,43 @@ describe('GitHub repository address', () => {
 });
 
 describe('GitHub reader', () => {
+  it('reuses an ETag response only within the same credential session', async () => {
+    const credentials = new MemoryCredentials();
+    credentials.set('target', 'synthetic-private-token');
+    const headers: Headers[] = [];
+    const fetcher: typeof fetch = vi.fn(async (_input, init) => {
+      headers.push(new Headers(init?.headers));
+      if (headers.length === 1) return json(repoPayload, { headers: { etag: '"v1"' } });
+      if (headers.length === 2) return new Response(null, { status: 304 });
+      return json({}, { status: 404 });
+    });
+    const reader = new GitHubReader({ fetcher, credentials, credentialSlot: 'target' });
+    await reader.getRepository({ owner: 'acme', name: 'demo' });
+    expect(await reader.getRepository({ owner: 'acme', name: 'demo' })).toEqual(repo);
+    expect(headers[1].get('if-none-match')).toBe('"v1"');
+    credentials.set('target', undefined);
+    await expect(reader.getRepository({ owner: 'acme', name: 'demo' })).rejects.toMatchObject({ kind: 'not-found-or-no-access' });
+    expect(headers[2].has('if-none-match')).toBe(false);
+    expect(headers[2].has('authorization')).toBe(false);
+  });
+
+  it('serializes requests and does not send a queued request after its credential changes', async () => {
+    const credentials = new MemoryCredentials();
+    credentials.set('target', 'synthetic-token');
+    let release!: (response: Response) => void;
+    const fetcher: typeof fetch = vi.fn(() => new Promise<Response>((resolve) => { release = resolve; }));
+    const reader = new GitHubReader({ fetcher, credentials, credentialSlot: 'target' });
+    const first = reader.getRepository({ owner: 'acme', name: 'demo' }).catch((error: unknown) => error);
+    const second = reader.getRepository({ owner: 'acme', name: 'another' }).catch((error: unknown) => error);
+    await Promise.resolve();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    credentials.set('target', undefined);
+    release(json(repoPayload));
+    expect(await first).toMatchObject({ name: 'AbortError' });
+    expect(await second).toMatchObject({ name: 'AbortError' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it('calls browser fetch with the global receiver required by native implementations', async () => {
     const fetcher: typeof fetch = async function (this: unknown) {
       if (this !== globalThis) throw new TypeError('Illegal invocation');

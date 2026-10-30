@@ -12,6 +12,7 @@
 .project-controls { display: flex; gap: 10px; align-items: center; color: #8390a3; font-size: 11px; }
 .project-controls select, .refresh-button, .secondary-button { border: 1px solid #e0e5ee; border-radius: 8px; background: #fff; padding: 9px 11px; color: #4f5d76; font: inherit; cursor: pointer; }
 .refresh-button:disabled { opacity: .5; cursor: not-allowed; }
+.refresh-info { color: #8995a9; font-size: 11px; margin: 9px 0 0; }
 .next-step { display: flex; gap: 12px; align-items: flex-start; background: #f0f2ff; border: 1px solid #e0e5ff; border-radius: 12px; padding: 16px; margin-top: 22px; color: #586ae0; font-size: 12px; }
 .next-step > span { font-size: 17px; }
 .next-step p { margin: 6px 0 0; color: #7e8aac; line-height: 1.5; }

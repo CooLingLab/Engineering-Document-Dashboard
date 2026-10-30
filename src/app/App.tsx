@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectProject } from '../components/ConnectProject';
 import { StageDetails } from '../components/StageDetails';
 import { SyncPanel } from '../components/SyncPanel';
@@ -10,6 +10,7 @@ import { indexDocuments } from '../documents/match';
 import { type NodeView, type ProjectConfig } from '../domain/project';
 import { GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
+import { RefreshScheduler, type RefreshState } from '../github/refresh';
 import { useProject } from './useProject';
 import { templates } from '../templates/catalog';
 import { deriveNodeView } from '../workflow/status';
@@ -30,6 +31,30 @@ export default function App() {
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState<ProjectConfig[]>([]);
   const [documentRoot, setDocumentRoot] = useState('docs/development');
+  const [refreshState, setRefreshState] = useState<RefreshState | null>(null);
+  const scheduler = useRef<RefreshScheduler | null>(null);
+  const refreshCallback = useRef(session.refresh);
+  refreshCallback.current = session.refresh;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const credentialVersion = credentials.version('target');
+  useEffect(() => {
+    if (!config || !selectedBranch) { setRefreshState(null); return; }
+    const current = new RefreshScheduler({ now: Date.now, refresh: () => refreshCallback.current(true), onChange: setRefreshState });
+    scheduler.current = current;
+    setRefreshState(null);
+    const update = () => current.update({ visible: document.visibilityState === 'visible' && !busyRef.current,
+      authenticated: Boolean(credentials.get('target')) });
+    const focus = () => current.focus();
+    update();
+    document.addEventListener('visibilitychange', update);
+    window.addEventListener('focus', focus);
+    return () => { current.stop(); if (scheduler.current === current) scheduler.current = null;
+      document.removeEventListener('visibilitychange', update); window.removeEventListener('focus', focus); };
+  }, [config?.repository.id, selectedBranch, credentials, credentialVersion]);
+  useEffect(() => {
+    scheduler.current?.update({ visible: document.visibilityState === 'visible' && !busy, authenticated: Boolean(credentials.get('target')) });
+  }, [busy, credentials, credentialVersion]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
@@ -87,7 +112,8 @@ export default function App() {
         <div className="eyebrow"><span className="eyebrow-dot" /> 从这里开始</div>
         <h1>让每一步开发，都<span>清晰可见。</span></h1>
         <p className="intro">连接你的 GitHub 项目，把散落的文档和开发进度放到一张路线图上。</p>
-        {config && snapshot && <div className="project-bar"><div><span className="project-label">当前项目{dirty ? ' · 有未同步修改' : ''}</span><strong>{config.repository.owner}/{config.repository.name}</strong></div><div className="project-controls"><label htmlFor="branch-select">分支</label><select id="branch-select" aria-label="当前分支" value={selectedBranch} onChange={(event) => void session.selectBranch(event.target.value)} disabled={busy || !branches.length}>{!branches.length && <option value={selectedBranch}>{selectedBranch || '尚无分支'}</option>}{branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select><button type="button" className="refresh-button" disabled={busy || !selectedBranch} onClick={() => void session.refresh()}>刷新文档</button><button type="button" className="refresh-button" onClick={() => setShowConnect(!showConnect)}>{showConnect ? '收起连接' : '更换项目'}</button></div></div>}
+        {config && snapshot && <div className="project-bar"><div><span className="project-label">当前项目{dirty ? ' · 有未同步修改' : ''}</span><strong>{config.repository.owner}/{config.repository.name}</strong></div><div className="project-controls"><label htmlFor="branch-select">分支</label><select id="branch-select" aria-label="当前分支" value={selectedBranch} onChange={(event) => void session.selectBranch(event.target.value)} disabled={busy || !branches.length}>{!branches.length && <option value={selectedBranch}>{selectedBranch || '尚无分支'}</option>}{branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select><button type="button" className="refresh-button" disabled={busy || !selectedBranch || Boolean(refreshState?.nextRetryAt && Date.now() < refreshState.nextRetryAt)} onClick={() => void (scheduler.current?.refreshNow() ?? session.refresh())}>刷新文档</button><button type="button" className="refresh-button" onClick={() => setShowConnect(!showConnect)}>{showConnect ? '收起连接' : '更换项目'}</button></div></div>}
+        {snapshot?.ref && <p className="refresh-info">上次读取：{new Date(refreshState?.lastCheckedAt ?? snapshot.fetchedAt).toLocaleString()} · 版本 {snapshot.ref.commitSha.slice(0, 7)}{refreshState?.pausedReason ? ` · ${refreshState.pausedReason}` : ''}</p>}
         {showConnect && <ConnectProject onConnect={connect} busy={busy} error={error} />}
         {!showConnect && error && <p className="connection-error" role="alert">{error}</p>}
         {config && snapshot && <details className="directory-settings"><summary>文档目录：{config.documentRules.root} · 修改文档目录</summary><form onSubmit={(event) => { event.preventDefault(); changeDirectory(); }}><label>文档目录<input value={documentRoot} onChange={(event) => setDocumentRoot(event.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>应用目录</button></form></details>}

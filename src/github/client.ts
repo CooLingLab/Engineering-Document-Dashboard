@@ -29,25 +29,41 @@ function encodePath(path: string): string {
 
 export class GitHubReader {
   #options: { fetcher: typeof fetch; credentials: MemoryCredentials; credentialSlot: 'target' | 'config' };
+  #queue: Promise<unknown> = Promise.resolve();
+  #cache = new Map<string, { etag: string; value: unknown; headers: Headers }>();
+  #cacheVersion = -1;
+  #unsubscribe: () => void;
 
   constructor(options: { fetcher: typeof fetch; credentials: MemoryCredentials; credentialSlot: 'target' | 'config' }) {
     this.#options = options;
+    this.#unsubscribe = options.credentials.onChange((slot) => { if (slot === options.credentialSlot) this.#cache.clear(); });
   }
 
-  async #request(url: URL, signal?: AbortSignal): Promise<Response> {
+  dispose(): void { this.#unsubscribe(); this.#cache.clear(); }
+
+  #request(url: URL, signal: AbortSignal | undefined, etag: string | undefined, version: number): Promise<Response> {
+    const pending = this.#queue.then(() => this.#doRequest(url, signal, etag, version));
+    this.#queue = pending.catch(() => undefined);
+    return pending;
+  }
+
+  async #doRequest(url: URL, signal: AbortSignal | undefined, etag: string | undefined, version: number): Promise<Response> {
     if (url.origin !== API_ORIGIN || url.username || url.password) throw new GitHubError('network', 'GitHub API 地址无效。');
+    if (signal?.aborted || this.#options.credentials.version(this.#options.credentialSlot) !== version) throw new DOMException('请求已取消', 'AbortError');
     const headers = new Headers({ Accept: 'application/vnd.github+json' });
+    if (etag) headers.set('If-None-Match', etag);
     const token = this.#options.credentials.get(this.#options.credentialSlot);
     if (token) headers.set('Authorization', `Bearer ${token}`);
     let response: Response;
     try {
-      response = await this.#options.fetcher.call(globalThis, url.toString(), { method: 'GET', headers, signal });
+      response = await this.#options.fetcher.call(globalThis, url.toString(), { method: 'GET', headers, signal, redirect: 'error' });
     } catch (error) {
       if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
       throw new GitHubError('network', '无法连接 GitHub，请检查网络。');
     }
     if (response.url && new URL(response.url).origin !== API_ORIGIN) throw new GitHubError('network', 'GitHub 返回了不受支持的跳转。');
-    if (response.ok) return response;
+    if (signal?.aborted || this.#options.credentials.version(this.#options.credentialSlot) !== version) throw new DOMException('请求已取消', 'AbortError');
+    if (response.ok || response.status === 304) return response;
     if (response.status === 401) throw new GitHubError('unauthorized', 'GitHub 授权无效或已过期。');
     if (response.status === 429 || (response.status === 403 &&
       (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')))) {
@@ -63,9 +79,27 @@ export class GitHubReader {
   }
 
   async #json(url: URL, signal?: AbortSignal): Promise<{ value: unknown; response: Response }> {
-    const response = await this.#request(url, signal);
-    try { return { value: await response.json(), response }; }
-    catch { throw new GitHubError('network', 'GitHub 返回的数据无法读取。'); }
+    const version = this.#options.credentials.version(this.#options.credentialSlot);
+    if (version !== this.#cacheVersion) { this.#cache.clear(); this.#cacheVersion = version; }
+    const key = url.toString();
+    const cached = this.#cache.get(key);
+    const response = await this.#request(url, signal, cached?.etag, version);
+    if (signal?.aborted || this.#options.credentials.version(this.#options.credentialSlot) !== version) throw new DOMException('请求已取消', 'AbortError');
+    if (response.status === 304) {
+      if (!cached) throw new GitHubError('network', 'GitHub 返回了无法验证的缓存响应。');
+      return { value: cached.value, response: new Response(null, { status: 200, headers: cached.headers }) };
+    }
+    try {
+      const value: unknown = await response.json();
+      if (signal?.aborted || this.#options.credentials.version(this.#options.credentialSlot) !== version) throw new DOMException('请求已取消', 'AbortError');
+      const etag = response.headers.get('etag');
+      if (etag) {
+        if (this.#cache.size >= 512) this.#cache.delete(this.#cache.keys().next().value!);
+        this.#cache.set(key, { etag, value, headers: new Headers(response.headers) });
+      } else this.#cache.delete(key);
+      return { value, response };
+    }
+    catch (error) { if (error instanceof DOMException && error.name === 'AbortError') throw error; throw new GitHubError('network', 'GitHub 返回的数据无法读取。'); }
   }
 
   async getRepository(input: RepositoryInput, signal?: AbortSignal): Promise<Repository> {
