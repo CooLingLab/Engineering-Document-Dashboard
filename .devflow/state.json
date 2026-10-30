@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1",
+  "project": "Engineering-Document-Dashboard",
+  "active_release": "MVP",
+  "features": [
+    {
+      "id": "devflow-foundation",
+      "name": "Machine-readable development workflow",
+      "phase": "spec",
+      "status": "in_progress",
+      "artifacts": [
+        ".devflow/workflow.json",
+        ".devflow/README.md"
+      ],
+      "gate": {
+        "status": "pending",
+        "approved_by": null
+      },
+      "notes": "Initial metadata scaffold; dashboard integration not yet implemented."
+    }
+  ]
+}
