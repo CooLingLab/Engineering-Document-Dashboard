@@ -5,7 +5,7 @@ import { StageDetails } from '../components/StageDetails';
 import { SyncPanel } from '../components/SyncPanel';
 import { normalizeDocumentRoot } from '../documents/index';
 import { indexDocuments } from '../documents/match';
-import { getBranchState, type NodeView, type ProjectConfig } from '../domain/project';
+import type { NodeView, ProjectConfig } from '../domain/project';
 import { GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
 import { RefreshScheduler, type RefreshState } from '../github/refresh';
