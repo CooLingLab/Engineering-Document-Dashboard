@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { analysisInputKey, deriveNodeView, setDocumentChoice, setManualStatus } from '../../src/workflow/status';
 import { makeAnalysis, makeConfig, makeSnapshot } from '../fixtures';
+import { parseProjectConfig } from '../../src/domain/schema';
 
 describe('stage status', () => {
   it('keeps a manual status ahead of a fresh AI suggestion', () => {
@@ -19,6 +20,11 @@ describe('stage status', () => {
     expect(changed.branches['__proto__'].manualStatuses.requirements).toBe('done');
     expect(changed.branches.main.manualStatuses).toEqual({});
     expect(changed.branches.main.documentChoices['requirements-doc']).toBe('later');
+    const parsed = parseProjectConfig(JSON.parse(JSON.stringify(changed)));
+    expect(parsed.kind).toBe('supported');
+    if (parsed.kind !== 'supported') throw new Error('配置版本不受支持');
+    expect(Object.hasOwn(parsed.config.branches, '__proto__')).toBe(true);
+    expect(parsed.config.branches['__proto__'].manualStatuses.requirements).toBe('done');
   });
 
   it('marks old AI evidence stale without clearing a manual status', () => {

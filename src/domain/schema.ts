@@ -1,6 +1,22 @@
 import { z } from 'zod';
 import type { ProjectConfig } from './project';
 
+function safeRecord<T>(item: z.ZodType<T>) {
+  return z.unknown().transform((input, context): Record<string, T> => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      context.addIssue({ code: 'custom', message: '需要一个对象' });
+      return z.NEVER;
+    }
+    const result: Record<string, T> = {};
+    for (const [key, value] of Object.entries(input)) {
+      const parsed = item.safeParse(value);
+      if (!parsed.success) { context.addIssue({ code: 'custom', path: [key], message: '对象内容无效' }); continue; }
+      Object.defineProperty(result, key, { value: parsed.data, enumerable: true, writable: true, configurable: true });
+    }
+    return result;
+  });
+}
+
 const manualStatus = z.enum(['not-started', 'in-progress', 'done', 'deferred']);
 const documentChoice = z.enum(['needed', 'not-needed', 'later']);
 const repository = z.strictObject({
@@ -19,11 +35,11 @@ const graph = z.strictObject({
 const documentRules = z.strictObject({
   root: z.string(),
   expected: z.array(z.strictObject({ id: z.string(), nodeId: z.string(), fileName: z.string() })),
-  bindings: z.record(z.string(), z.string()),
+  bindings: safeRecord(z.string()),
 });
 const template = z.strictObject({
   id: z.string(), version: z.number().int(), title: z.string(), description: z.string(),
-  graph, documentRules, prompts: z.record(z.string(), z.string()),
+  graph, documentRules, prompts: safeRecord(z.string()),
 });
 const analysis = z.strictObject({
   nodeId: z.string(), branch: z.string(), commitSha: z.string(), createdAt: z.string(), model: z.string(),
@@ -33,11 +49,11 @@ const analysis = z.strictObject({
   nextAction: z.string().nullable(), adviceBasisFingerprint: z.string(),
 });
 const branchState = z.strictObject({
-  manualStatuses: z.record(z.string(), manualStatus),
-  documentChoices: z.record(z.string(), documentChoice),
-  analyses: z.record(z.string(), analysis),
+  manualStatuses: safeRecord(manualStatus),
+  documentChoices: safeRecord(documentChoice),
+  analyses: safeRecord(analysis),
 });
-const branches = z.record(z.string(), branchState);
+const branches = safeRecord(branchState);
 const backup = z.strictObject({
   id: z.string(), createdAt: z.string(), template: template.nullable(), graph, documentRules, branches,
 });
