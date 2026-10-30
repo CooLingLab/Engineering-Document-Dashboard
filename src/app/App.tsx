@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectProject } from '../components/ConnectProject';
 import { ModelPanel } from '../components/ModelPanel';
 import { StageDetails } from '../components/StageDetails';
+import { DocumentTree } from '../components/DocumentTree';
+import { DocumentPreview } from '../components/DocumentPreview';
+import { buildDocumentTree, buildDocumentStageLinks } from '../documents/tree';
 import { SyncPanel } from '../components/SyncPanel';
 import { normalizeDocumentRoot } from '../documents/index';
 import { indexDocuments } from '../documents/match';
@@ -18,6 +21,7 @@ import { deriveNodeView } from '../workflow/status';
 import { recommendNext } from '../workflow/recommend';
 import './app.css';
 import './components.css';
+import './explorer.css';
 
 export default function App() {
   const credentials = useMemo(() => new MemoryCredentials(), []);
@@ -32,8 +36,11 @@ export default function App() {
   const [showConnect, setShowConnect] = useState(true);
   const [connectionCount, setConnectionCount] = useState(0);
   const [documentRoot, setDocumentRoot] = useState('docs/development');
+  const [mobileView, setMobileView] = useState<'stages' | 'files'>('stages');
+  const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<RefreshState | null>(null);
   const scheduler = useRef<RefreshScheduler | null>(null);
+  const readerPanelRef = useRef<HTMLDivElement | null>(null);
   const refreshCallback = useRef(session.refresh);
   refreshCallback.current = session.refresh;
   const busyRef = useRef(busy);
@@ -67,7 +74,7 @@ export default function App() {
     const previousToken = credentials.get('target');
     credentials.set('target', token || undefined);
     if (await session.connect(input)) {
-      setShowConnect(false); setDocumentRoot(session.getState().config?.documentRules.root ?? devflowTemplate.documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
+      setShowConnect(false); setMobileView('stages'); setSelectedDocumentPath(null); setDocumentRoot(session.getState().config?.documentRules.root ?? devflowTemplate.documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
     } else credentials.set('target', previousToken);
   }
 
@@ -102,6 +109,33 @@ export default function App() {
     config && snapshot ? deriveNodeView(config, snapshot, node.id, aiEnabled) : { status: 'unknown', source: 'none', analysis: 'absent' }]));
   const recommendation = config && snapshot && documentIndex ? recommendNext(config, snapshot, documentIndex, aiEnabled) : null;
 
+  const documentTree = useMemo(() => snapshot ? buildDocumentTree(snapshot.root, snapshot.documents) : null, [snapshot]);
+  const documentLinks = useMemo(() => config && documentIndex ? buildDocumentStageLinks(documentIndex, config.graph) : null,
+    [config, documentIndex]);
+  const activeDocumentPath = snapshot && documentLinks
+    ? (selectedDocumentPath && snapshot.documents.some((file) => file.path === selectedDocumentPath) ? selectedDocumentPath : null)
+      ?? (selectedNodeId ? documentLinks.byStage.get(selectedNodeId)?.find((path) => snapshot.documents.some((file) => file.path === path)) : undefined)
+      ?? null
+    : null;
+
+  function chooseStage(id: string) {
+    setSelectedNodeId(id);
+    setSelectedDocumentPath(null);
+    setMobileView('stages');
+  }
+
+  function chooseDocument(path: string) {
+    if (!snapshot?.documents.some((file) => file.path === path)) return;
+    setSelectedDocumentPath(path);
+    // On phones, jump to the reader after choosing a file deep in the folder tree.
+    if (window.matchMedia?.('(max-width: 700px)').matches) {
+      window.requestAnimationFrame?.(() => readerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+    const stages = documentLinks?.byPath.get(path) ?? [];
+    if (stages.length && (!selectedNodeId || !stages.includes(selectedNodeId))) setSelectedNodeId(stages[0]);
+  }
+
+
   return <div className="app-shell">
     <aside className="sidebar" aria-label="主导航">
       <a className="brand" href="#home"><span className="brand-mark">▦</span><span>开发路线<small>DEVELOPMENT DASHBOARD</small></span></a>
@@ -129,9 +163,31 @@ export default function App() {
         {config && config.template?.id !== DEVFLOW_TEMPLATE_ID && <div className="standard-migration" role="status"><div><strong>当前仓库仍在使用旧版自定义流程</strong><p>可以切换到标准八阶段。旧流程与分支记录会自动备份，迁移后不会自动覆盖 GitHub 配置。</p></div><button type="button" className="secondary-button" disabled={busy || config.backups.length >= 10} onClick={adoptStandardWorkflow}>切换到八阶段 V3</button>{config.backups.length >= 10 && <small>备份已满，请先处理历史备份。</small>}</div>}
         {config && <BackupManager config={config} disabled={busy} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} />}
         {config && snapshot && documentIndex ? <>
-          <div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div>
-          <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
-          {selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)} />}
+          <div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => chooseStage(recommendation.nodeId!)}>查看建议环节 →</button>}</div></div>
+          {documentTree && documentLinks && <section className={`stage-document-workspace ${mobileView === 'files' ? 'is-files-view' : 'is-stages-view'}`} aria-label="开发阶段与文档目录">
+            <div className="workspace-view-toggle" role="group" aria-label="手机工作台视图">
+              <button type="button" aria-pressed={mobileView === 'stages'} onClick={() => setMobileView('stages')}>开发阶段</button>
+              <button type="button" aria-pressed={mobileView === 'files'} onClick={() => setMobileView('files')}>文件目录</button>
+            </div>
+            <div className="workspace-stage-navigation">
+              <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={chooseStage} />
+            </div>
+            <div className="workspace-content-grid">
+              <div className="workspace-tree-column">
+                <DocumentTree root={snapshot.root} tree={documentTree} documents={snapshot.documents}
+                  links={documentLinks} selectedStageId={selectedNodeId} selectedPath={activeDocumentPath} onSelectDocument={chooseDocument} />
+              </div>
+              <div className="workspace-reader-column">
+                <div ref={readerPanelRef}><DocumentPreview snapshot={snapshot} graph={config.graph} links={documentLinks} selectedStageId={selectedNodeId}
+                  selectedPath={activeDocumentPath} onSelectDocument={chooseDocument} onSelectStage={chooseStage} /></div>
+                {selectedNodeId && <div className="workspace-stage-details">
+                  <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex}
+                    beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)}
+                    onSelectDocument={chooseDocument} showEmbeddedReader={false} />
+                </div>}
+              </div>
+            </div>
+          </section>}
         </> : <div className="route-preview" aria-label="AI 开发八阶段">{devflowTemplate.graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
         <div className="footer-note">✳ 你的文档留在原来的仓库中，我们只读取它们。</div>
       </div>

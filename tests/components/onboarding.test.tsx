@@ -38,11 +38,12 @@ describe('first project connection', () => {
     expect(screen.getByText(/建议补充/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Strategic DDD/ }));
     const details = screen.getByRole('region', { name: 'Strategic DDD详情' });
-    expect(within(details).getByText('用户希望记录一本书。')).toBeInTheDocument();
+    const reader = screen.getByRole('region', { name: 'Markdown 文档阅读器' });
+    expect(within(reader).getByText('用户希望记录一本书。')).toBeInTheDocument();
     expect(within(details).getByText(/统一语言和业务边界/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /新手模式/ }));
     expect(within(details).queryByText(/统一语言和业务边界/)).not.toBeInTheDocument();
-    expect(within(details).getByText('用户希望记录一本书。')).toBeInTheDocument();
+    expect(within(reader).getByText('用户希望记录一本书。')).toBeInTheDocument();
     expect(within(details).getByRole('button', { name: '复制 prompt' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '编辑流程' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /未判断/ })).toHaveLength(8);

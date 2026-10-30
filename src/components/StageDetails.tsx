@@ -1,20 +1,25 @@
 import { getBranchState, type DocumentChoice, type DocumentSnapshot, type ManualStatus, type ProjectConfig } from '../domain/project';
 import type { DocumentIndex } from '../documents/match';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adviceBasisKey, analysisInputKey, deriveNodeView, setDocumentChoice, setManualStatus } from '../workflow/status';
 import { githubFileUrl, MarkdownReader } from './MarkdownReader';
-import { statusLabels } from './StageNode';
+import { statusLabels } from '../workflow/statusLabels';
 
-export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void };
+export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void; onSelectDocument?: (path: string) => void; showEmbeddedReader?: boolean };
 
-export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, aiEnabled = false, onChangeConfig }: StageDetailsProps) {
+export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, aiEnabled = false, onChangeConfig, onSelectDocument, showEmbeddedReader = true }: StageDetailsProps) {
   const [selectedPath, setSelectedPath] = useState<string>();
   const [copyMessage, setCopyMessage] = useState('');
+  const [additionalPath, setAdditionalPath] = useState('');
+  useEffect(() => setAdditionalPath(''), [nodeId]);
   const node = config.graph.nodes.find((item) => item.id === nodeId);
   if (!node) return null;
   const skippable = !['build', 'release'].includes(node.id);
   const matches = documentIndex.matches.filter((match) => match.nodeId === nodeId);
   const availablePaths = matches.filter((match) => match.kind === 'found').flatMap((match) => match.paths);
+  const linkedPaths = new Set(availablePaths);
+  const extraCandidates = snapshot.documents.filter((entry) => !linkedPaths.has(entry.path))
+    .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
   const path = selectedPath && availablePaths.includes(selectedPath) ? selectedPath : availablePaths[0];
   const document = snapshot.documents.find((item) => item.path === path);
   const prompt = node.promptIds.map((id) => config.template?.prompts[id]).find(Boolean);
@@ -25,6 +30,25 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
   const adviceCurrent = Boolean(branch && analysis?.adviceBasisFingerprint === adviceBasisKey(config, branch));
   const manual = Object.hasOwn(state.manualStatuses, nodeId) ? state.manualStatuses[nodeId] : '';
   const manualBasis = state.manualBases && Object.hasOwn(state.manualBases, nodeId) ? state.manualBases[nodeId] : undefined;
+
+  function addDocumentAssociation() {
+    if (!onChangeConfig || !snapshot.documents.some((file) => file.path === additionalPath) || linkedPaths.has(additionalPath)) return;
+    const next = structuredClone(config);
+    const id = `extra-${nodeId}-${crypto.randomUUID()}`;
+    next.documentRules.expected.push({ id, nodeId, fileName: additionalPath.split('/').at(-1)! });
+    next.documentRules.bindings[id] = additionalPath;
+    onChangeConfig(next);
+    setAdditionalPath('');
+  }
+
+  function removeDocumentAssociation(documentId: string) {
+    if (!onChangeConfig || !documentId.startsWith(`extra-${nodeId}-`)) return;
+    const next = structuredClone(config);
+    next.documentRules.expected = next.documentRules.expected.filter((item) => item.id !== documentId);
+    delete next.documentRules.bindings[documentId];
+    for (const state of Object.values(next.branches)) delete state.documentChoices[documentId];
+    onChangeConfig(next);
+  }
 
   async function copyPrompt() {
     if (!prompt) return;
@@ -55,7 +79,7 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
         <div className="document-panel"><div className="panel-heading"><h3>相关文档</h3><span>{matches.length} 项建议</span></div>
           {!matches.length && <p className="subtle">当前环节还没有关联文档。</p>}
           {matches.map((match) => <div className="document-item" key={match.documentId}>
-            {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
+            {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => onSelectDocument ? onSelectDocument(match.paths[0]) : setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
             <small>{match.kind === 'missing' ? '建议补充' : match.kind === 'unavailable' ? '无法读取' : match.kind === 'ambiguous' ? '有多个候选' : match.contentCheck === 'heading-only' ? '只有标题' : match.contentCheck === 'empty' ? '空文档' : '已找到'}</small>
             <select aria-label={`绑定文档：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`}
               value={config.documentRules.bindings[match.documentId] ?? ''}
@@ -71,14 +95,26 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
               {snapshot.documents.map((entry) => <option key={entry.path} value={entry.path}>{entry.path.split('/').at(-1)}</option>)}
             </select>
             <select aria-label={`文档取舍：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`} value={Object.hasOwn(state.documentChoices, match.documentId) ? state.documentChoices[match.documentId] : 'needed'} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setDocumentChoice(config, branch, match.documentId, event.target.value as DocumentChoice)); }}><option value="needed">需要</option><option value="later">稍后再说</option><option value="not-needed">不需要</option></select>
+            {match.documentId.startsWith(`extra-${nodeId}-`) && <button type="button" className="text-danger" disabled={!onChangeConfig}
+              aria-label={`移除文档关联：${match.paths[0] ?? match.documentId}`}
+              onClick={() => removeDocumentAssociation(match.documentId)}>移除关联</button>}
           </div>)}
-          {document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
+          {onChangeConfig && <div className="stage-association-add">
+            <label>关联更多已有文档
+              <select aria-label="关联更多已有文档" value={additionalPath} onChange={(event) => setAdditionalPath(event.target.value)}>
+                <option value="">选择目录中的 Markdown 文件</option>
+                {extraCandidates.map((file) => <option key={file.path} value={file.path}>{file.path}</option>)}
+              </select>
+            </label>
+            <button type="button" className="secondary-button" disabled={!additionalPath} onClick={addDocumentAssociation}>关联到本阶段</button>
+          </div>}
+          {showEmbeddedReader && document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
         </div>
         <div className="prompt-panel"><div className="panel-heading"><h3>通用 prompt</h3><span>可在其他 AI 工具中使用</span></div>
           {prompt ? <><p className="prompt-copy">{prompt}</p><button type="button" className="secondary-button" onClick={copyPrompt}>复制 prompt</button>{copyMessage && <p className="copy-message" role="status">{copyMessage}</p>}</> : <p className="subtle">这个环节暂没有通用 prompt。</p>}
         </div>
       </div>
-      {documentIndex.others.length > 0 && <div className="other-documents"><strong>其他文档</strong><p>这些文档尚未关联到当前路线：</p>{documentIndex.others.map((item) => <span key={item.path}>{item.path}</span>)}</div>}
+      {showEmbeddedReader && documentIndex.others.length > 0 && <div className="other-documents"><strong>其他文档</strong><p>这些文档尚未关联到当前路线：</p>{documentIndex.others.map((item) => <span key={item.path}>{item.path}</span>)}</div>}
     </section>
   );
 }
