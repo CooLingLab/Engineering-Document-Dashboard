@@ -13,6 +13,7 @@ import { useProject } from './useProject';
 import { devflowTemplate, DEVFLOW_TEMPLATE_ID } from '../templates/catalog';
 import { switchTemplate } from '../workflow/backup';
 import { FixedStageNavigator } from '../components/FixedStageNavigator';
+import { BackupManager } from '../components/BackupManager';
 import { deriveNodeView } from '../workflow/status';
 import { recommendNext } from '../workflow/recommend';
 import './app.css';
@@ -126,6 +127,7 @@ export default function App() {
         {snapshot?.issues.map((issue, index) => <p key={`${issue.path}-${index}`} className="scan-issue" role="status">{issue.message}</p>)}
         <section className="route-intro" aria-labelledby="route-title"><div><div className="section-kicker">STANDARD AI DEVELOPMENT LIFECYCLE · V3</div><h2 id="route-title">固定八阶段开发路线</h2><p>主干固定，按阶段管理文档、状态和验收；不适用的阶段可手动跳过。</p></div><span className="recommended">标准流程</span></section>
         {config && config.template?.id !== DEVFLOW_TEMPLATE_ID && <div className="standard-migration" role="status"><div><strong>当前仓库仍在使用旧版自定义流程</strong><p>可以切换到标准八阶段。旧流程与分支记录会自动备份，迁移后不会自动覆盖 GitHub 配置。</p></div><button type="button" className="secondary-button" disabled={busy || config.backups.length >= 10} onClick={adoptStandardWorkflow}>切换到八阶段 V3</button>{config.backups.length >= 10 && <small>备份已满，请先处理历史备份。</small>}</div>}
+        {config && <BackupManager config={config} disabled={busy} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} />}
         {config && snapshot && documentIndex ? <>
           <div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div>
           <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
