@@ -65,4 +65,33 @@ describe('first project connection', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/不存在|无法访问/));
     expect(screen.queryByText(/建议补充/)).not.toBeInTheDocument();
   });
+
+  it('keeps unsynced edits when the user declines to switch projects', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/repos/example/project') return json({ id: 123, name: 'project', owner: { login: 'example' }, default_branch: 'main' });
+      if (url.pathname.endsWith('/branches')) return json([{ name: 'main' }]);
+      if (url.pathname.includes('/commits/')) return json({ sha: 'c1' });
+      if (url.pathname.includes('/contents/')) return json([]);
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+    fireEvent.change(screen.getByLabelText(/GitHub 仓库/), { target: { value: 'example/project' } });
+    fireEvent.click(screen.getByRole('button', { name: /连接仓库/ }));
+    await screen.findByText('example/project');
+    fireEvent.click(screen.getByRole('button', { name: '编辑流程' }));
+    fireEvent.change(screen.getByLabelText('新环节名称'), { target: { value: '复盘' } });
+    fireEvent.click(screen.getByRole('button', { name: '添加环节' }));
+    expect(screen.getByText(/有未同步修改/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '更换项目' }));
+    fireEvent.change(screen.getByLabelText(/GitHub 仓库/), { target: { value: 'example/other' } });
+    const count = fetcher.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /连接仓库/ }));
+    expect(confirm).toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(count);
+    expect(screen.getByRole('button', { name: '查看复盘' })).toBeInTheDocument();
+    confirm.mockRestore();
+  });
 });

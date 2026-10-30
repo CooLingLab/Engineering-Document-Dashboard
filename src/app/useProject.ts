@@ -1,0 +1,101 @@
+import { useEffect, useReducer, useRef } from 'react';
+import { loadDocumentSnapshot } from '../documents/index';
+import { createProject, type DocumentSnapshot, type ProjectConfig, type Repository } from '../domain/project';
+import { GitHubError, type GitHubReader } from '../github/client';
+import { parseRepositoryInput } from '../github/repository';
+import { templates } from '../templates/catalog';
+import { initialSession, projectReducer, type ProjectAction } from './projectReducer';
+
+function emptySnapshot(repository: Repository, root: string): DocumentSnapshot {
+  return { repository, ref: null, root, documents: [], issues: [], fetchedAt: new Date().toISOString() };
+}
+
+export function useProject(reader: GitHubReader) {
+  const [state, reactDispatch] = useReducer(projectReducer, initialSession);
+  const current = useRef(state);
+  const request = useRef<{ generation: number; controller: AbortController } | null>(null);
+  const generation = useRef(0);
+  function dispatch(action: ProjectAction) {
+    current.current = projectReducer(current.current, action);
+    reactDispatch(action);
+  }
+  function begin(repositoryId: number | null, branch: string | null) {
+    request.current?.controller.abort();
+    const next = { generation: ++generation.current, controller: new AbortController() };
+    request.current = next;
+    dispatch({ type: 'begin', generation: next.generation, repositoryId, branch });
+    return next;
+  }
+  useEffect(() => () => { request.current?.controller.abort(); generation.current++; }, []);
+
+  async function connect(input: string) {
+    let parsed;
+    try { parsed = parseRepositoryInput(input); }
+    catch (error) { dispatch({ type: 'error', error: error instanceof Error ? error.message : '仓库地址无效。' }); return false; }
+    const pending = begin(null, null);
+    let repositoryId: number | null = null;
+    let branch: string | null = null;
+    try {
+      const repository = await reader.getRepository(parsed, pending.controller.signal);
+      if (pending.generation !== generation.current) return false;
+      repositoryId = repository.id;
+      dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
+      let branches: string[];
+      try { branches = await reader.listBranches(repository, pending.controller.signal); }
+      catch (error) {
+        if (error instanceof GitHubError && error.kind === 'empty-repository') branches = [];
+        else throw error;
+      }
+      if (pending.generation !== generation.current) return false;
+      branch = branches.length ? repository.defaultBranch || branches[0] : null;
+      dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
+      const config = createProject(repository, templates[0]);
+      const snapshot = branch ? await loadDocumentSnapshot(reader, repository, branch, config.documentRules.root, pending.controller.signal)
+        : emptySnapshot(repository, config.documentRules.root);
+      dispatch({ type: 'connected', generation: pending.generation, repositoryId, branch, config, snapshot, branches });
+      return pending.generation === generation.current;
+    } catch (error) {
+      if (!pending.controller.signal.aborted) dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch,
+        error: error instanceof GitHubError ? error.message : '连接失败，请检查地址或网络后重试。' });
+      return false;
+    }
+  }
+
+  async function load(branch: string | null, config: ProjectConfig, replaceConfig = false) {
+    const repositoryId = config.repository.id;
+    const originalConfig = current.current.config;
+    const pending = begin(repositoryId, branch);
+    try {
+      const snapshot = branch ? await loadDocumentSnapshot(reader, config.repository, branch, config.documentRules.root, pending.controller.signal)
+        : emptySnapshot(config.repository, config.documentRules.root);
+      if (replaceConfig && current.current.config !== originalConfig && pending.generation === generation.current) {
+        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, error: '读取期间流程已更改，请重新应用文档目录。' });
+        return false;
+      }
+      dispatch({ type: 'loaded', generation: pending.generation, repositoryId, branch, snapshot, ...(replaceConfig ? { config } : {}) });
+      return pending.generation === generation.current;
+    } catch (error) {
+      if (!pending.controller.signal.aborted) dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch,
+        error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
+      return false;
+    }
+  }
+  async function selectBranch(branch: string) {
+    if (current.current.config && branch) await load(branch, current.current.config);
+  }
+  async function refresh() {
+    if (current.current.config) await load(current.current.selectedBranch, current.current.config);
+  }
+  async function applyConfig(config: ProjectConfig) {
+    if (current.current.config?.repository.id !== config.repository.id) return false;
+    if (current.current.snapshot && current.current.snapshot.root !== config.documentRules.root) {
+      return await load(current.current.selectedBranch, config, true);
+    }
+    dispatch({ type: 'config', config });
+    return true;
+  }
+  return { state, connect, selectBranch, refresh, applyConfig,
+    selectNode: (nodeId: string | null) => dispatch({ type: 'node', nodeId }),
+    setError: (error: string | null) => dispatch({ type: 'error', error }),
+    markSaved: () => dispatch({ type: 'saved' }) };
+}

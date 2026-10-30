@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ConnectProject } from '../components/ConnectProject';
 import { StageDetails } from '../components/StageDetails';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { WorkflowEditor } from '../components/WorkflowEditor';
-import { loadDocumentSnapshot, normalizeDocumentRoot } from '../documents/index';
+import { normalizeDocumentRoot } from '../documents/index';
 import { indexDocuments } from '../documents/match';
-import { createProject, type DocumentSnapshot, type NodeView, type ProjectConfig, type Repository } from '../domain/project';
-import { GitHubError, GitHubReader } from '../github/client';
+import { type NodeView, type ProjectConfig } from '../domain/project';
+import { GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
-import { parseRepositoryInput } from '../github/repository';
+import { useProject } from './useProject';
 import { templates } from '../templates/catalog';
 import { deriveNodeView } from '../workflow/status';
 import { recommendNext } from '../workflow/recommend';
@@ -19,100 +19,39 @@ import './components.css';
 export default function App() {
   const credentials = useMemo(() => new MemoryCredentials(), []);
   const reader = useMemo(() => new GitHubReader({ fetcher: fetch, credentials, credentialSlot: 'target' }), [credentials]);
-  const [config, setConfig] = useState<ProjectConfig | null>(null);
-  const [snapshot, setSnapshot] = useState<DocumentSnapshot | null>(null);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const session = useProject(reader);
+  const { config, snapshot, branches, selectedNodeId, busy, error, dirty } = session.state;
+  const selectedBranch = session.state.selectedBranch ?? '';
+  const setSelectedNodeId = session.selectNode;
+  const setError = session.setError;
   const [beginnerMode, setBeginnerMode] = useState(true);
   const [showConnect, setShowConnect] = useState(true);
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState<ProjectConfig[]>([]);
   const [documentRoot, setDocumentRoot] = useState('docs/development');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const request = useRef<{ generation: number; controller: AbortController } | null>(null);
-  const generation = useRef(0);
-
-  function beginRequest() {
-    request.current?.controller.abort();
-    const current = { generation: ++generation.current, controller: new AbortController() };
-    request.current = current;
-    return current;
-  }
-
-  function finishRequest(current: { generation: number }) {
-    if (current.generation === generation.current) setBusy(false);
-  }
-
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
   async function connect(input: string, token: string) {
-    let parsed;
-    try { parsed = parseRepositoryInput(input); }
-    catch (parseError) { setError(parseError instanceof Error ? parseError.message : '仓库地址无效。'); return; }
-    const current = beginRequest();
-    setBusy(true); setError(null); credentials.set('target', token || undefined);
-    try {
-      const repository = await reader.getRepository(parsed, current.controller.signal);
-      let availableBranches: string[];
-      try { availableBranches = await reader.listBranches(repository, current.controller.signal); }
-      catch (branchError) {
-        if (branchError instanceof GitHubError && branchError.kind === 'empty-repository') availableBranches = [];
-        else throw branchError;
-      }
-      const branch = repository.defaultBranch || availableBranches[0] || '';
-      const nextConfig = createProject(repository, templates[0]);
-      const nextSnapshot = branch
-        ? await loadDocumentSnapshot(reader, repository, branch, nextConfig.documentRules.root, current.controller.signal)
-        : emptySnapshot(repository, nextConfig.documentRules.root);
-      if (current.generation !== generation.current) return;
-      setConfig(nextConfig); setSnapshot(nextSnapshot); setBranches(availableBranches);
-      setSelectedBranch(branch); setSelectedNodeId(nextConfig.graph.nodes[0]?.id ?? null);
-      setShowConnect(false); setEditing(false); setHistory([]); setDocumentRoot(nextConfig.documentRules.root);
-    } catch (connectError) {
-      if (current.generation === generation.current && !current.controller.signal.aborted) {
-        setError(connectError instanceof GitHubError ? connectError.message : '连接失败，请检查地址或网络后重试。');
-      }
-    } finally { finishRequest(current); }
-  }
-
-  async function changeBranch(branch: string) {
-    if (!config || !branch) return;
-    const current = beginRequest();
-    setBusy(true); setError(null);
-    try {
-      const nextSnapshot = await loadDocumentSnapshot(reader, config.repository, branch, config.documentRules.root, current.controller.signal);
-      if (current.generation !== generation.current) return;
-      setSelectedBranch(branch); setSnapshot(nextSnapshot);
-    } catch (branchError) {
-      if (current.generation === generation.current && !current.controller.signal.aborted) {
-        setError(branchError instanceof GitHubError ? branchError.message : '读取分支失败，请稍后重试。');
-      }
-    } finally { finishRequest(current); }
+    if (dirty && !window.confirm('当前流程有尚未同步的修改。切换项目会丢失这些修改，确定继续吗？')) return;
+    const previousToken = credentials.get('target');
+    credentials.set('target', token || undefined);
+    if (await session.connect(input)) {
+      setShowConnect(false); setEditing(false); setHistory([]); setDocumentRoot(templates[0].documentRules.root);
+    } else credentials.set('target', previousToken);
   }
 
   async function applyConfigChange(next: ProjectConfig, mode: 'push' | 'undo' = 'push') {
     if (!config) return;
     const previous = config;
-    const commit = (nextSnapshot?: DocumentSnapshot) => {
-      setHistory((items) => mode === 'undo' ? items.slice(0, -1) : [...items.slice(-19), structuredClone(previous)]);
-      setConfig(next);
+    const previousHistory = history;
+    setHistory((items) => mode === 'undo' ? items.slice(0, -1) : [...items.slice(-19), structuredClone(previous)]);
+    if (await session.applyConfig(next)) {
       setDocumentRoot(next.documentRules.root);
-      if (nextSnapshot) setSnapshot(nextSnapshot);
-      if (!next.graph.nodes.some((node) => node.id === selectedNodeId)) setSelectedNodeId(next.graph.nodes[0]?.id ?? null);
-    };
-    if (!snapshot || next.documentRules.root === snapshot.root) { commit(); return; }
-    const current = beginRequest();
-    setBusy(true); setError(null);
-    try {
-      const nextSnapshot = selectedBranch
-        ? await loadDocumentSnapshot(reader, next.repository, selectedBranch, next.documentRules.root, current.controller.signal)
-        : emptySnapshot(next.repository, next.documentRules.root);
-      if (current.generation === generation.current) commit(nextSnapshot);
-    } catch (changeError) {
-      if (current.generation === generation.current && !current.controller.signal.aborted) {
-        setError(changeError instanceof GitHubError ? changeError.message : '更新文档目录失败，请检查路径或网络。');
-      }
-    } finally { finishRequest(current); }
+    } else setHistory(previousHistory);
   }
 
   function changeDirectory() {
@@ -147,7 +86,7 @@ export default function App() {
         <div className="eyebrow"><span className="eyebrow-dot" /> 从这里开始</div>
         <h1>让每一步开发，都<span>清晰可见。</span></h1>
         <p className="intro">连接你的 GitHub 项目，把散落的文档和开发进度放到一张路线图上。</p>
-        {config && snapshot && <div className="project-bar"><div><span className="project-label">当前项目</span><strong>{config.repository.owner}/{config.repository.name}</strong></div><div className="project-controls"><label htmlFor="branch-select">分支</label><select id="branch-select" aria-label="当前分支" value={selectedBranch} onChange={(event) => void changeBranch(event.target.value)} disabled={busy || !branches.length}>{!branches.length && <option value={selectedBranch}>{selectedBranch || '尚无分支'}</option>}{branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select><button type="button" className="refresh-button" disabled={busy || !selectedBranch} onClick={() => void changeBranch(selectedBranch)}>刷新文档</button><button type="button" className="refresh-button" onClick={() => setShowConnect(!showConnect)}>{showConnect ? '收起连接' : '更换项目'}</button></div></div>}
+        {config && snapshot && <div className="project-bar"><div><span className="project-label">当前项目{dirty ? ' · 有未同步修改' : ''}</span><strong>{config.repository.owner}/{config.repository.name}</strong></div><div className="project-controls"><label htmlFor="branch-select">分支</label><select id="branch-select" aria-label="当前分支" value={selectedBranch} onChange={(event) => void session.selectBranch(event.target.value)} disabled={busy || !branches.length}>{!branches.length && <option value={selectedBranch}>{selectedBranch || '尚无分支'}</option>}{branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select><button type="button" className="refresh-button" disabled={busy || !selectedBranch} onClick={() => void session.refresh()}>刷新文档</button><button type="button" className="refresh-button" onClick={() => setShowConnect(!showConnect)}>{showConnect ? '收起连接' : '更换项目'}</button></div></div>}
         {showConnect && <ConnectProject onConnect={connect} busy={busy} error={error} />}
         {!showConnect && error && <p className="connection-error" role="alert">{error}</p>}
         {config && snapshot && <details className="directory-settings"><summary>文档目录：{config.documentRules.root} · 修改文档目录</summary><form onSubmit={(event) => { event.preventDefault(); changeDirectory(); }}><label>文档目录<input value={documentRoot} onChange={(event) => setDocumentRoot(event.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>应用目录</button></form></details>}
@@ -158,8 +97,4 @@ export default function App() {
       </div>
     </main>
   </div>;
-}
-
-function emptySnapshot(repository: Repository, root: string): DocumentSnapshot {
-  return { repository, ref: null, root, documents: [], issues: [], fetchedAt: new Date().toISOString() };
 }
