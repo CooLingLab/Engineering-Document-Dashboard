@@ -1,6 +1,6 @@
 import type { AnalysisRecord } from './analysis';
 
-export type ManualStatus = 'not-started' | 'in-progress' | 'done' | 'deferred';
+export type ManualStatus = 'not-started' | 'in-progress' | 'done' | 'deferred' | 'skipped';
 export type DocumentChoice = 'needed' | 'not-needed' | 'later';
 export type Repository = { id: number; owner: string; name: string; defaultBranch: string | null };
 export type BranchRef = { name: string; commitSha: string };
