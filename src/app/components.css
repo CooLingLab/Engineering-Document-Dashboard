@@ -84,7 +84,7 @@
   .mobile-editor-tools { display: flex; gap: 8px; }
   .mobile-editor-tools button { min-height: 44px; border: 1px solid #dce2ef; border-radius: 9px; background: #fff; padding: 0 12px; color: #5366bd; font-size: 12px; }
   .mobile-editor-help, .mobile-graph-preview p { color: #707f98; line-height: 1.7; font-size: 12px; margin: 14px 0; }
-  .mobile-graph-preview .flow-canvas { height: min(62dvh, 540px); min-height: 350px; touch-action: pan-x pan-y; }
+  .mobile-graph-preview .flow-canvas { height: min(62dvh, 540px); min-height: 350px; touch-action: none; }
   .mobile-stage-list { margin: 12px 0; padding: 0; list-style: none; }
   .mobile-stage-row { margin-bottom: 5px; }
   .mobile-stage-card { display: flex; background: white; border: 1px solid #e1e6f2; border-radius: 13px; min-height: 78px; overflow: hidden; }
