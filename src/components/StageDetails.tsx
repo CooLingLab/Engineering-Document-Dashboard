@@ -57,6 +57,19 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
           {matches.map((match) => <div className="document-item" key={match.documentId}>
             {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
             <small>{match.kind === 'missing' ? '建议补充' : match.kind === 'unavailable' ? '无法读取' : match.kind === 'ambiguous' ? '有多个候选' : match.contentCheck === 'heading-only' ? '只有标题' : match.contentCheck === 'empty' ? '空文档' : '已找到'}</small>
+            <select aria-label={`绑定文档：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`}
+              value={config.documentRules.bindings[match.documentId] ?? ''}
+              disabled={!onChangeConfig}
+              onChange={(event) => {
+                if (!onChangeConfig) return;
+                const next = structuredClone(config);
+                if (event.target.value) next.documentRules.bindings[match.documentId] = event.target.value;
+                else delete next.documentRules.bindings[match.documentId];
+                onChangeConfig(next);
+              }}>
+              <option value="">自动匹配</option>
+              {snapshot.documents.map((entry) => <option key={entry.path} value={entry.path}>{entry.path.split('/').at(-1)}</option>)}
+            </select>
             <select aria-label={`文档取舍：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`} value={Object.hasOwn(state.documentChoices, match.documentId) ? state.documentChoices[match.documentId] : 'needed'} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setDocumentChoice(config, branch, match.documentId, event.target.value as DocumentChoice)); }}><option value="needed">需要</option><option value="later">稍后再说</option><option value="not-needed">不需要</option></select>
           </div>)}
           {document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
