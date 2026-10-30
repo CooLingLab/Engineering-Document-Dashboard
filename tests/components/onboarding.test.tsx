@@ -84,7 +84,7 @@ describe('first project connection', () => {
     fireEvent.click(screen.getByRole('button', { name: '编辑流程' }));
     fireEvent.change(screen.getByLabelText('新环节名称'), { target: { value: '复盘' } });
     fireEvent.click(screen.getByRole('button', { name: '添加环节' }));
-    expect(screen.getByText(/有未同步修改/)).toBeInTheDocument();
+    expect(screen.getAllByText(/有未同步修改/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '更换项目' }));
     fireEvent.change(screen.getByLabelText(/GitHub 仓库/), { target: { value: 'example/other' } });
     const count = fetcher.mock.calls.length;

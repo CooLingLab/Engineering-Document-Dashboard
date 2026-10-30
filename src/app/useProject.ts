@@ -97,5 +97,5 @@ export function useProject(reader: GitHubReader) {
   return { state, connect, selectBranch, refresh, applyConfig,
     selectNode: (nodeId: string | null) => dispatch({ type: 'node', nodeId }),
     setError: (error: string | null) => dispatch({ type: 'error', error }),
-    markSaved: () => dispatch({ type: 'saved' }) };
+    markSaved: (config: ProjectConfig) => dispatch({ type: 'saved', config }) };
 }

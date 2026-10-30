@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ConnectProject } from '../components/ConnectProject';
 import { StageDetails } from '../components/StageDetails';
+import { SyncPanel } from '../components/SyncPanel';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { WorkflowEditor } from '../components/WorkflowEditor';
@@ -36,7 +37,7 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   async function connect(input: string, token: string) {
-    if (dirty && !window.confirm('当前流程有尚未同步的修改。切换项目会丢失这些修改，确定继续吗？')) return;
+    if (dirty && !window.confirm('当前流程有尚未同步的修改。要保留它们，请先取消并在“配置同步”中保存；切换项目会丢失这些修改。确定继续切换吗？')) return;
     const previousToken = credentials.get('target');
     credentials.set('target', token || undefined);
     if (await session.connect(input)) {
@@ -90,6 +91,9 @@ export default function App() {
         {showConnect && <ConnectProject onConnect={connect} busy={busy} error={error} />}
         {!showConnect && error && <p className="connection-error" role="alert">{error}</p>}
         {config && snapshot && <details className="directory-settings"><summary>文档目录：{config.documentRules.root} · 修改文档目录</summary><form onSubmit={(event) => { event.preventDefault(); changeDirectory(); }}><label>文档目录<input value={documentRoot} onChange={(event) => setDocumentRoot(event.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>应用目录</button></form></details>}
+        {config && <SyncPanel key={config.repository.id} config={config} dirty={dirty} credentials={credentials} fetcher={fetch}
+          onLoaded={async (loaded) => { const applied = await session.applyConfig(loaded); if (applied) { session.markSaved(loaded); setDocumentRoot(loaded.documentRules.root); setHistory([]); } return applied; }}
+          onSaved={session.markSaved} />}
         {snapshot?.issues.map((issue, index) => <p key={`${issue.path}-${index}`} className="scan-issue" role="status">{issue.message}</p>)}
         <section className="route-intro" aria-labelledby="route-title"><div><div className="section-kicker">YOUR DEVELOPMENT JOURNEY</div><h2 id="route-title">你的开发路线</h2><p>不必一次完成所有事情。先看全貌，再从眼前的一步开始。</p></div>{config ? <button type="button" className="secondary-button" onClick={() => setEditing(!editing)}>{editing ? '完成编辑' : '编辑流程'}</button> : <span className="recommended">推荐路线</span>}</section>
         {config && snapshot && documentIndex ? <><div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} onGraphChange={editing && !busy ? (graph) => void applyConfigChange({ ...config, graph }) : undefined} documentIndex={documentIndex} />{editing && <fieldset className="editing-container" disabled={busy}><WorkflowEditor config={config} selectedNodeId={selectedNodeId} documentIndex={documentIndex} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} onUndo={undo} canUndo={history.length > 0} /><TemplatePicker config={config} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} /></fieldset>}{selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} onChangeConfig={(next) => void applyConfigChange(next)} />}</> : <div className="route-preview" aria-label="通用应用开发流程">{templates[0].graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}

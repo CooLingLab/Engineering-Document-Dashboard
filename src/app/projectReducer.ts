@@ -20,7 +20,7 @@ export type ProjectAction =
   | { type: 'config'; config: ProjectConfig }
   | { type: 'node'; nodeId: string | null }
   | { type: 'error'; error: string | null }
-  | { type: 'saved' };
+  | { type: 'saved'; config: ProjectConfig };
 
 export function projectReducer(state: ProjectSession, action: ProjectAction): ProjectSession {
   if (action.type === 'begin') return { ...state, generation: action.generation, requestRepositoryId: action.repositoryId, requestBranch: action.branch, busy: true, error: null };
@@ -30,7 +30,7 @@ export function projectReducer(state: ProjectSession, action: ProjectAction): Pr
     ? { ...state, config: action.config, dirty: true, selectedNodeId: action.config.graph.nodes.some((node) => node.id === state.selectedNodeId) ? state.selectedNodeId : action.config.graph.nodes[0]?.id ?? null } : state;
   if (action.type === 'node') return { ...state, selectedNodeId: action.nodeId };
   if (action.type === 'error') return { ...state, error: action.error };
-  if (action.type === 'saved') return { ...state, dirty: false };
+  if (action.type === 'saved') return state.config === action.config ? { ...state, dirty: false } : state;
   if (action.generation !== state.generation || action.repositoryId !== state.requestRepositoryId || action.branch !== state.requestBranch) return state;
   if (action.type === 'failed') return { ...state, busy: false, error: action.error };
   if (action.type === 'connected') return { ...state, config: action.config, snapshot: action.snapshot, branches: action.branches,

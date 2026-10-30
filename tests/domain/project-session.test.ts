@@ -94,4 +94,14 @@ describe('project session', () => {
     await act(async () => { await result.current.applyConfig({ ...result.current.state.config!, graph: { nodes: [], edges: [] } }); });
     expect(result.current.state.dirty).toBe(true);
   });
+
+  it('does not clear later edits when an earlier version finishes saving', async () => {
+    const { reader } = fakeReader();
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    const earlier = result.current.state.config!;
+    await act(async () => { await result.current.applyConfig(setManualStatus(earlier, 'main', 'requirements', 'done')); });
+    act(() => result.current.markSaved(earlier));
+    expect(result.current.state.dirty).toBe(true);
+  });
 });
