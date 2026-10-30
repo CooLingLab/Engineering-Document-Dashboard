@@ -5,9 +5,9 @@ import { adviceBasisKey, analysisInputKey, deriveNodeView, setDocumentChoice, se
 import { githubFileUrl, MarkdownReader } from './MarkdownReader';
 import { statusLabels } from './StageNode';
 
-export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void };
+export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void; onSelectDocument?: (path: string) => void; showEmbeddedReader?: boolean };
 
-export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, aiEnabled = false, onChangeConfig }: StageDetailsProps) {
+export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, aiEnabled = false, onChangeConfig, onSelectDocument, showEmbeddedReader = true }: StageDetailsProps) {
   const [selectedPath, setSelectedPath] = useState<string>();
   const [copyMessage, setCopyMessage] = useState('');
   const node = config.graph.nodes.find((item) => item.id === nodeId);
@@ -55,7 +55,7 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
         <div className="document-panel"><div className="panel-heading"><h3>相关文档</h3><span>{matches.length} 项建议</span></div>
           {!matches.length && <p className="subtle">当前环节还没有关联文档。</p>}
           {matches.map((match) => <div className="document-item" key={match.documentId}>
-            {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
+            {match.kind === 'found' ? <button type="button" className="document-link" onClick={() => onSelectDocument ? onSelectDocument(match.paths[0]) : setSelectedPath(match.paths[0])}>{match.paths[0].split('/').at(-1)}</button> : <span>{config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}</span>}
             <small>{match.kind === 'missing' ? '建议补充' : match.kind === 'unavailable' ? '无法读取' : match.kind === 'ambiguous' ? '有多个候选' : match.contentCheck === 'heading-only' ? '只有标题' : match.contentCheck === 'empty' ? '空文档' : '已找到'}</small>
             <select aria-label={`绑定文档：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`}
               value={config.documentRules.bindings[match.documentId] ?? ''}
@@ -72,13 +72,13 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
             </select>
             <select aria-label={`文档取舍：${config.documentRules.expected.find((item) => item.id === match.documentId)?.fileName}`} value={Object.hasOwn(state.documentChoices, match.documentId) ? state.documentChoices[match.documentId] : 'needed'} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setDocumentChoice(config, branch, match.documentId, event.target.value as DocumentChoice)); }}><option value="needed">需要</option><option value="later">稍后再说</option><option value="not-needed">不需要</option></select>
           </div>)}
-          {document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
+          {showEmbeddedReader && document && <div className="document-reading"><div className="reading-bar"><span>{document.path}</span>{githubFileUrl(snapshot, document.path) && <a href={githubFileUrl(snapshot, document.path)} target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>}</div><MarkdownReader content={document.content} documentPath={document.path} snapshot={snapshot} /></div>}
         </div>
         <div className="prompt-panel"><div className="panel-heading"><h3>通用 prompt</h3><span>可在其他 AI 工具中使用</span></div>
           {prompt ? <><p className="prompt-copy">{prompt}</p><button type="button" className="secondary-button" onClick={copyPrompt}>复制 prompt</button>{copyMessage && <p className="copy-message" role="status">{copyMessage}</p>}</> : <p className="subtle">这个环节暂没有通用 prompt。</p>}
         </div>
       </div>
-      {documentIndex.others.length > 0 && <div className="other-documents"><strong>其他文档</strong><p>这些文档尚未关联到当前路线：</p>{documentIndex.others.map((item) => <span key={item.path}>{item.path}</span>)}</div>}
+      {showEmbeddedReader && documentIndex.others.length > 0 && <div className="other-documents"><strong>其他文档</strong><p>这些文档尚未关联到当前路线：</p>{documentIndex.others.map((item) => <span key={item.path}>{item.path}</span>)}</div>}
     </section>
   );
 }
