@@ -11,8 +11,8 @@ test('analysis requires confirmation, preserves manual status, and becomes stale
     if (url.pathname === '/repos/fixture/demo') body = { id: 123, name: 'demo', owner: { login: 'fixture' }, default_branch: 'main' };
     else if (url.pathname.endsWith('/branches')) body = [{ name: 'main' }];
     else if (url.pathname.includes('/commits/')) body = { sha: blob === 'blob-1' ? 'commit1' : 'commit2' };
-    else if (url.pathname.endsWith('/contents/docs/development')) body = [{ path: 'docs/development/01-vision.md', type: 'file', sha: blob, size }];
-    else if (url.pathname.endsWith('/01-vision.md')) body = { type: 'file', path: 'docs/development/01-vision.md', sha: blob, size, encoding: 'base64', content: Buffer.from(text).toString('base64') };
+    else if (url.pathname.endsWith('/contents/docs/development')) body = [{ path: 'docs/development/01-idea.md', type: 'file', sha: blob, size }];
+    else if (url.pathname.endsWith('/01-idea.md')) body = { type: 'file', path: 'docs/development/01-idea.md', sha: blob, size, encoding: 'base64', content: Buffer.from(text).toString('base64') };
     else return route.fulfill({ status: 404, json: {} });
     return route.fulfill({ status: 200, json: body });
   });
@@ -22,7 +22,7 @@ test('analysis requires confirmation, preserves manual status, and becomes stale
     const data = route.request().postDataJSON();
     expect(data).not.toHaveProperty('tools');
     expect(JSON.stringify(data)).not.toContain('synthetic-model-key');
-    const result = { nodeId: 'vision', decision: 'done', summary: '目标已经描述', evidence: [{ path: 'docs/development/01-vision.md', startLine: 2, endLine: 2 }], nextAction: '检查目标' };
+    const result = { nodeId: 'idea', decision: 'done', summary: '目标已经描述', evidence: [{ path: 'docs/development/01-idea.md', startLine: 2, endLine: 2 }], nextAction: '检查目标' };
     return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, json: { choices: [{ message: { content: JSON.stringify(result) } }] } });
   });
   await page.goto('/');
@@ -36,7 +36,7 @@ test('analysis requires confirmation, preserves manual status, and becomes stale
   await page.getByLabel('模型名称').fill('sample');
   await page.getByLabel('模型密钥').fill('synthetic-model-key');
   await page.getByRole('button', { name: '分析当前环节' }).click();
-  await expect(page.getByRole('region', { name: '分析范围预览' })).toContainText('01-vision.md');
+  await expect(page.getByRole('region', { name: '分析范围预览' })).toContainText('01-idea.md');
   expect(modelRequests).toBe(0);
   await page.getByRole('button', { name: '确认发送并分析' }).click();
   await expect(page.getByText('目标已经描述')).toBeVisible();
