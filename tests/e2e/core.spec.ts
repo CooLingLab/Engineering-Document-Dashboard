@@ -12,8 +12,8 @@ test('private repository credentials remain in memory and branch statuses stay s
     if (url.pathname === '/repos/fixture/private') body = { id: 123, name: 'private', owner: { login: 'fixture' }, default_branch: 'main' };
     else if (url.pathname.endsWith('/branches')) body = [{ name: 'main' }, { name: 'feature' }];
     else if (url.pathname.includes('/commits/')) body = { sha: url.pathname.endsWith('/feature') ? 'feature-sha' : 'main-sha' };
-    else if (url.pathname.endsWith('/contents/docs/development')) body = [{ type: 'file', path: 'docs/development/02-requirements.md', sha: 'blob', size: Buffer.byteLength(document) }];
-    else if (url.pathname.endsWith('/02-requirements.md')) body = { type: 'file', path: 'docs/development/02-requirements.md', sha: 'blob', size: Buffer.byteLength(document), encoding: 'base64', content: Buffer.from(document).toString('base64') };
+    else if (url.pathname.endsWith('/contents/docs/development')) body = [{ type: 'file', path: 'docs/development/02-domain.md', sha: 'blob', size: Buffer.byteLength(document) }];
+    else if (url.pathname.endsWith('/02-domain.md')) body = { type: 'file', path: 'docs/development/02-domain.md', sha: 'blob', size: Buffer.byteLength(document), encoding: 'base64', content: Buffer.from(document).toString('base64') };
     else return route.fulfill({ status: 404, json: {} });
     return route.fulfill({ status: 200, json: body, headers: { 'access-control-allow-origin': '*' } });
   });
@@ -22,8 +22,8 @@ test('private repository credentials remain in memory and branch statuses stay s
   await page.getByText('私有仓库授权（可选）').click();
   await page.getByLabel('GitHub 读取令牌').fill(token);
   await page.getByRole('button', { name: /连接仓库/ }).click();
-  await page.getByRole('button', { name: '查看需求' }).focus();
-  await page.getByRole('button', { name: '查看需求' }).press('Enter');
+  await page.getByRole('button', { name: /Strategic DDD/ }).focus();
+  await page.getByRole('button', { name: /Strategic DDD/ }).press('Enter');
   await expect(page.getByText('私人示例正文')).toBeVisible();
   await page.getByLabel('手动状态').selectOption('done');
   await page.getByLabel('当前分支').selectOption('feature');
@@ -43,7 +43,7 @@ test('an initially empty repository can discover its first branch without losing
     if (url.pathname === '/repos/fixture/empty') body = { id: 456, name: 'empty', owner: { login: 'fixture' }, default_branch: 'main' };
     else if (url.pathname.endsWith('/branches')) body = hasCommit ? [{ name: 'main' }] : [];
     else if (url.pathname.includes('/commits/')) body = { sha: 'new-commit' };
-    else if (url.pathname.endsWith('/contents/docs/development')) body = [];
+    else if (url.pathname.endsWith('/contents/docs/development') || url.pathname.endsWith('/contents/docs/extra')) body = [];
     else return route.fulfill({ status: 404, json: {} });
     return route.fulfill({ status: 200, json: body });
   });
@@ -51,13 +51,14 @@ test('an initially empty repository can discover its first branch without losing
   await page.getByLabel('GitHub 仓库地址').fill('fixture/empty');
   await page.getByRole('button', { name: /连接仓库/ }).click();
   await expect(page.getByLabel('当前分支')).toHaveValue('');
-  await page.getByRole('button', { name: '编辑流程' }).click();
-  await page.getByLabel('新环节名称').fill('复盘');
-  await page.getByRole('button', { name: '添加环节' }).click();
+  await page.getByText(/修改文档目录/).click();
+  await page.getByLabel('文档目录').fill('docs/extra');
+  await page.getByRole('button', { name: '应用目录' }).click();
   hasCommit = true;
   await page.getByRole('button', { name: '刷新文档' }).click();
   await expect(page.getByLabel('当前分支')).toHaveValue('main');
-  await expect(page.getByRole('button', { name: '查看复盘' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '八阶段开发流程' }).getByRole('button')).toHaveCount(8);
+  await expect(page.getByText(/文档目录：docs\/extra/)).toBeVisible();
   await expect(page.getByText('当前项目 · 有未同步修改')).toBeVisible();
 });
 
