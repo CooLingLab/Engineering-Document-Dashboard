@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { DocumentFile } from '../domain/project';
 import { ancestorFolders, type DocumentStageLinks, type FolderTreeItem } from '../documents/tree';
 
@@ -53,7 +53,7 @@ export function DocumentTree({ root, tree, documents, links, selectedStageId, se
     </li>;
   }
 
-  function renderFolder(folder: FolderTreeItem): React.ReactNode {
+  function renderFolder(folder: FolderTreeItem): ReactNode {
     const open = expanded.has(folder.path);
     return <li key={folder.path} role="treeitem" aria-expanded={open}>
       <button type="button" className="tree-folder" aria-label={`${open ? '收起' : '展开'}文件夹：${folder.path}`}
