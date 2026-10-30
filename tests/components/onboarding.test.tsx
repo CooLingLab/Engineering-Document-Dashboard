@@ -8,7 +8,7 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 
 describe('first project connection', () => {
   it('shows the route first and selected stage details after reading the project', async () => {
-    const text = '# 需求\n用户希望记录一本书。';
+    const text = '# 领域模型\n用户希望记录一本书。';
     const bytes = new TextEncoder().encode(text);
     const encoded = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
     const fetcher: typeof fetch = vi.fn(async (input) => {
@@ -17,10 +17,10 @@ describe('first project connection', () => {
       if (url.pathname.endsWith('/branches')) return json([{ name: 'main' }]);
       if (url.pathname.includes('/commits/')) return json({ sha: 'c1' });
       if (url.pathname.endsWith('/contents/docs/development')) return json([
-        { path: 'docs/development/02-requirements.md', sha: 'blob-1', size: bytes.length, type: 'file' },
+        { path: 'docs/development/02-domain.md', sha: 'blob-1', size: bytes.length, type: 'file' },
       ]);
-      if (url.pathname.endsWith('/02-requirements.md')) return json({
-        path: 'docs/development/02-requirements.md', sha: 'blob-1', size: bytes.length, type: 'file', encoding: 'base64', content: encoded,
+      if (url.pathname.endsWith('/02-domain.md')) return json({
+        path: 'docs/development/02-domain.md', sha: 'blob-1', size: bytes.length, type: 'file', encoding: 'base64', content: encoded,
       });
       return json({ message: 'Not Found' }, 404);
     });
@@ -36,21 +36,18 @@ describe('first project connection', () => {
     expect(screen.getByLabelText(/GitHub 仓库/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '收起连接' }));
     expect(screen.getByText(/建议补充/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看需求' }));
-    const details = screen.getByRole('region', { name: '需求详情' });
+    fireEvent.click(screen.getByRole('button', { name: /Strategic DDD/ }));
+    const details = screen.getByRole('region', { name: 'Strategic DDD详情' });
     expect(within(details).getByText('用户希望记录一本书。')).toBeInTheDocument();
-    expect(within(details).getByText(/减少开发中反复猜测/)).toBeInTheDocument();
+    expect(within(details).getByText(/统一语言和业务边界/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /新手模式/ }));
-    expect(within(details).queryByText(/减少开发中反复猜测/)).not.toBeInTheDocument();
+    expect(within(details).queryByText(/统一语言和业务边界/)).not.toBeInTheDocument();
     expect(within(details).getByText('用户希望记录一本书。')).toBeInTheDocument();
     expect(within(details).getByRole('button', { name: '复制 prompt' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '编辑流程' }));
-    fireEvent.change(screen.getByLabelText('新环节名称'), { target: { value: '复盘' } });
-    fireEvent.change(screen.getByLabelText('环节说明'), { target: { value: '总结本轮经验' } });
-    fireEvent.click(screen.getByRole('button', { name: '添加环节' }));
-    expect(screen.getByRole('button', { name: '查看复盘' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '撤销上一步' }));
-    expect(screen.queryByRole('button', { name: '查看复盘' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '编辑流程' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /未判断/ })).toHaveLength(8);
+    fireEvent.change(within(details).getByRole('combobox', { name: '手动状态' }), { target: { value: 'skipped' } });
+    expect(within(details).getByText(/不会被视为已完成/)).toBeInTheDocument();
     fireEvent.click(screen.getByText(/修改文档目录/));
     fireEvent.change(screen.getByLabelText('文档目录'), { target: { value: 'docs/other' } });
     fireEvent.click(screen.getByRole('button', { name: '应用目录' }));
@@ -81,9 +78,7 @@ describe('first project connection', () => {
     fireEvent.change(screen.getByLabelText(/GitHub 仓库/), { target: { value: 'example/project' } });
     fireEvent.click(screen.getByRole('button', { name: /连接仓库/ }));
     await screen.findByText('example/project');
-    fireEvent.click(screen.getByRole('button', { name: '编辑流程' }));
-    fireEvent.change(screen.getByLabelText('新环节名称'), { target: { value: '复盘' } });
-    fireEvent.click(screen.getByRole('button', { name: '添加环节' }));
+    fireEvent.change(screen.getByRole('combobox', { name: '手动状态' }), { target: { value: 'in-progress' } });
     expect(screen.getAllByText(/有未同步修改/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '更换项目' }));
     fireEvent.change(screen.getByLabelText(/GitHub 仓库/), { target: { value: 'example/other' } });
@@ -91,7 +86,7 @@ describe('first project connection', () => {
     fireEvent.click(screen.getByRole('button', { name: /连接仓库/ }));
     expect(confirm).toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(count);
-    expect(screen.getByRole('button', { name: '查看复盘' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '手动状态' })).toHaveValue('in-progress');
     confirm.mockRestore();
   });
 });
