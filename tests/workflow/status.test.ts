@@ -44,4 +44,11 @@ describe('stage status', () => {
     const after = analysisInputKey(config, { ...snapshot, ref: { name: 'main', commitSha: 'new-code-only' } }, 'requirements');
     expect(after).toBe(before);
   });
+
+  it('keeps partial analysis as a reference rather than a complete stage decision', () => {
+    const snapshot = makeSnapshot();
+    const config = setManualStatus(makeConfig(), 'main', 'requirements', null);
+    config.branches.main.analyses.requirements = makeAnalysis({ decision: 'done', scopeComplete: false, inputFingerprint: analysisInputKey(config, snapshot, 'requirements') });
+    expect(deriveNodeView(config, snapshot, 'requirements', true)).toMatchObject({ status: 'unknown', source: 'none' });
+  });
 });

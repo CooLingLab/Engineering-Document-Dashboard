@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { indexDocuments } from '../../src/documents/match';
 import { createProject } from '../../src/domain/project';
 import { recommendNext } from '../../src/workflow/recommend';
-import { setDocumentChoice, setManualStatus } from '../../src/workflow/status';
+import { adviceBasisKey, analysisInputKey, setDocumentChoice, setManualStatus } from '../../src/workflow/status';
 import { templates } from '../../src/templates/catalog';
-import { makeConfig, makeSnapshot } from '../fixtures';
+import { makeAnalysis, makeConfig, makeSnapshot } from '../fixtures';
 
 describe('next-step suggestions', () => {
   it('suggests the missing required document without claiming the stage is incomplete', () => {
@@ -38,5 +38,14 @@ describe('next-step suggestions', () => {
     const config = makeConfig();
     const snapshot = makeSnapshot({ issues: [{ path: 'docs/development', kind: 'incomplete', message: '未读完' }] });
     expect(recommendNext(config, snapshot, indexDocuments(config, snapshot), false).action).toBe('review-stage');
+  });
+
+  it('does not use an AI decision for routing after its manual basis changes', () => {
+    const snapshot = makeSnapshot();
+    const original = makeConfig();
+    const basis = adviceBasisKey(original, 'main');
+    const config = setDocumentChoice(original, 'main', 'requirements-doc', 'later');
+    config.branches.main.analyses.requirements = makeAnalysis({ decision: 'done', inputFingerprint: analysisInputKey(config, snapshot, 'requirements'), adviceBasisFingerprint: basis });
+    expect(recommendNext(config, snapshot, indexDocuments(config, snapshot), true).action).toBe('review-stage');
   });
 });

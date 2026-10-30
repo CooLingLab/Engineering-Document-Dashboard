@@ -54,4 +54,18 @@ describe('model adapters', () => {
     const network = new OpenAICompatibleAdapter(vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
     await expect(network.analyze(input, settings, undefined)).rejects.toThrow(/网络.*跨域/);
   });
+  it('does not send excluded paths through internal fingerprints', async () => {
+    const config = makeConfig();
+    config.documentRules.expected.push({ id: 'extra', nodeId: 'requirements', fileName: 'extra.md' });
+    const snapshot = makeSnapshot({ documents: [
+      { path: 'docs/development/02-requirements.md', blobSha: 'a', content: '用户需求', size: 12 },
+      { path: 'docs/development/extra.md', blobSha: 'b', content: '不应发送', size: 12 },
+    ] });
+    const scoped = buildAnalysisInput(config, snapshot, 'requirements', 12_000, ['docs/development/extra.md']);
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(result) } }] }), { status: 200 }));
+    await new OpenAICompatibleAdapter(fetcher).analyze(scoped, { adapter: 'openai-compatible', endpoint: 'https://model.example/api', model: 'sample', maxInputChars: 12_000 }, undefined);
+    const [, options] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(options.body)).not.toContain('extra.md');
+    expect(String(options.body)).not.toContain('不应发送');
+  });
 });

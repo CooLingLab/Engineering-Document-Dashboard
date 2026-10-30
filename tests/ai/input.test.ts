@@ -26,4 +26,10 @@ describe('analysis input', () => {
     expect(() => buildAnalysisInput(makeConfig(), makeSnapshot(), 'unknown', 12_000)).toThrow();
     expect(() => buildAnalysisInput(makeConfig(), makeSnapshot({ ref: null }), 'requirements', 12_000)).toThrow();
   });
+  it('allows excluding a document to fit the budget and identifies a partial scope', () => {
+    const snapshot = makeSnapshot({ documents: [{ path: 'docs/development/02-requirements.md', blobSha: 'sha', content: 'a'.repeat(1000), size: 1000 }] });
+    const input = buildAnalysisInput(makeConfig(), snapshot, 'requirements', 12_000, ['docs/development/02-requirements.md']);
+    expect(input.documents).toEqual([]);
+    expect(input.scopeComplete).toBe(false);
+  });
 });

@@ -31,7 +31,7 @@ export function deriveNodeView(config: ProjectConfig, snapshot: DocumentSnapshot
   const fresh = Boolean(record && record.branch === branch && record.inputFingerprint === analysisInputKey(config, snapshot, nodeId));
   const analysis: NodeView['analysis'] = !aiEnabled ? 'disabled' : !record ? 'absent' : fresh ? 'fresh' : 'stale';
   if (manual) return { status: manual, source: 'manual', analysis };
-  if (aiEnabled && fresh && record && record.decision !== 'insufficient') return { status: record.decision, source: 'ai', analysis };
+  if (aiEnabled && fresh && record && record.scopeComplete !== false && record.decision !== 'insufficient') return { status: record.decision, source: 'ai', analysis };
   return { status: 'unknown', source: 'none', analysis };
 }
 

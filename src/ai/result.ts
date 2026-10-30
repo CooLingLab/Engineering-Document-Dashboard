@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AnalysisRecord } from '../domain/analysis';
 import type { AnalysisInput } from './input';
-import type { ModelSettings } from './adapters';
+import { endpointUrl, type ModelSettings } from './adapters';
 
 const resultSchema = z.strictObject({
   nodeId: z.string().max(200), decision: z.enum(['not-started', 'in-progress', 'done', 'deferred', 'insufficient']),
@@ -25,7 +25,7 @@ export function validateAnalysis(raw: unknown, input: AnalysisInput, settings: M
   const downgrade = !valid || !hasContent || (result.decision !== 'insufficient' && result.evidence.length === 0);
   return {
     nodeId: input.nodeId, branch: input.branch, commitSha: input.commitSha, createdAt: now.toISOString(),
-    model: settings.model, adapter: settings.adapter,
+    model: settings.model, adapter: settings.adapter, endpoint: endpointUrl(settings), scopeComplete: input.scopeComplete,
     decision: downgrade ? 'insufficient' : result.decision,
     summary: downgrade ? '可核对的文档内容或证据不足，无法判断当前环节。' : result.summary,
     evidence: downgrade ? [] : result.evidence, nextAction: downgrade ? null : result.nextAction,

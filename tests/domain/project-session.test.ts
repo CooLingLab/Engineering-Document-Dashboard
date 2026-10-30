@@ -5,6 +5,7 @@ import { getBranchState } from '../../src/domain/project';
 import type { GitHubReader } from '../../src/github/client';
 import { GitHubError } from '../../src/github/client';
 import { setManualStatus } from '../../src/workflow/status';
+import { makeAnalysis } from '../fixtures';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -121,5 +122,16 @@ describe('project session', () => {
     sha = 'blob-2';
     await act(async () => { await result.current.refresh(); });
     expect(result.current.state.snapshot!.documents[0]).not.toBe(original);
+  });
+  it('stores a delayed analysis on its original special-name branch without overwriting manual changes', async () => {
+    const { reader } = fakeReader();
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, '__proto__', 'requirements', 'done')); });
+    act(() => result.current.commitAnalysis(1, makeAnalysis({ branch: '__proto__', decision: 'in-progress' })));
+    const branch = getBranchState(result.current.state.config!, '__proto__');
+    expect(branch.manualStatuses.requirements).toBe('done');
+    expect(branch.analyses.requirements.decision).toBe('in-progress');
+    expect(result.current.state.selectedBranch).toBe('main');
   });
 });

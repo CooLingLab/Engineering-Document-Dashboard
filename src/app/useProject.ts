@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef } from 'react';
 import { loadDocumentSnapshot } from '../documents/index';
-import { createProject, type DocumentSnapshot, type ProjectConfig, type Repository } from '../domain/project';
+import { createProject, getBranchState, type DocumentSnapshot, type ProjectConfig, type Repository } from '../domain/project';
+import type { AnalysisRecord } from '../domain/analysis';
 import { GitHubError, type GitHubReader } from '../github/client';
 import { parseRepositoryInput } from '../github/repository';
 import { templates } from '../templates/catalog';
@@ -103,8 +104,17 @@ export function useProject(reader: GitHubReader) {
     dispatch({ type: 'config', config });
     return true;
   }
+  function commitAnalysis(repositoryId: number, record: AnalysisRecord) {
+    const config = current.current.config;
+    if (!config || config.repository.id !== repositoryId || !config.graph.nodes.some((node) => node.id === record.nodeId)) return;
+    const next = structuredClone(config);
+    const branch = structuredClone(getBranchState(next, record.branch));
+    Object.defineProperty(branch.analyses, record.nodeId, { value: record, enumerable: true, writable: true, configurable: true });
+    Object.defineProperty(next.branches, record.branch, { value: branch, enumerable: true, writable: true, configurable: true });
+    dispatch({ type: 'config', config: next });
+  }
   return { state, connect, selectBranch, refresh, applyConfig,
     selectNode: (nodeId: string | null) => dispatch({ type: 'node', nodeId }),
     setError: (error: string | null) => dispatch({ type: 'error', error }),
-    markSaved: (config: ProjectConfig) => dispatch({ type: 'saved', config }) };
+    markSaved: (config: ProjectConfig) => dispatch({ type: 'saved', config }), commitAnalysis };
 }

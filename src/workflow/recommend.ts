@@ -1,15 +1,19 @@
 import { getBranchState, type DocumentSnapshot, type ProjectConfig, type Recommendation } from '../domain/project';
 import type { DocumentIndex } from '../documents/match';
-import { deriveNodeView } from './status';
+import { adviceBasisKey, deriveNodeView } from './status';
 
 export function recommendNext(config: ProjectConfig, snapshot: DocumentSnapshot, index: DocumentIndex, aiEnabled: boolean): Recommendation {
   const nodes = [...config.graph.nodes].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   if (!nodes.length) return { nodeId: null, action: 'add-stage', source: 'template', reason: '先添加一个开发环节，或选择一条路线。' };
   const branch = snapshot.ref?.name ?? '';
   const state = getBranchState(config, branch);
-  const views = new Map(nodes.map((node) => [node.id, deriveNodeView(config, snapshot, node.id, aiEnabled)]));
+  const basis = adviceBasisKey(config, branch);
+  const views = new Map(nodes.map((node) => {
+    const analysis = Object.hasOwn(state.analyses, node.id) ? state.analyses[node.id] : undefined;
+    return [node.id, deriveNodeView(config, snapshot, node.id, aiEnabled && analysis?.adviceBasisFingerprint === basis)] as const;
+  }));
   const pending = nodes.filter((node) => !['done', 'deferred'].includes(views.get(node.id)!.status));
-  if (!pending.length) return { nodeId: null, action: 'all-done', source: 'manual', reason: '当前没有建议推进的环节。' };
+  if (!pending.length) return { nodeId: null, action: 'all-done', source: nodes.some((node) => views.get(node.id)?.source === 'ai') ? 'ai' : 'manual', reason: '当前没有建议推进的环节。' };
   const progressing = pending.find((node) => views.get(node.id)?.source === 'manual' && views.get(node.id)?.status === 'in-progress');
   const ready = pending.find((node) => config.graph.edges.filter((edge) => edge.target === node.id).every((edge) => {
     const previous = views.get(edge.source)?.status;

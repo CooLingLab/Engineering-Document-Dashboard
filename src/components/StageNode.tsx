@@ -12,7 +12,7 @@ export function StageNode({ data, selected }: NodeProps<StageFlowNode>) {
     <Handle type="target" position={Position.Left} />
     <div className="stage-node-top"><span>{String(data.order + 1).padStart(2, '0')}</span><span className="stage-node-dot" /></div>
     <strong>{data.title}</strong>
-    <div className="stage-node-meta"><span>{statusLabels[data.view.status]}</span>{data.missing > 0 && <span className="stage-missing">缺 {data.missing} 份</span>}</div>
+    <div className="stage-node-meta"><span>{statusLabels[data.view.status]}{data.view.source === 'ai' ? ' · 文档分析' : ''}</span>{data.missing > 0 && <span className="stage-missing">缺 {data.missing} 份</span>}</div>
     <Handle type="source" position={Position.Right} />
   </div>;
 }

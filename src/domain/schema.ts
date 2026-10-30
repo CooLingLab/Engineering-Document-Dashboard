@@ -43,7 +43,7 @@ const template = z.strictObject({
 });
 const analysis = z.strictObject({
   nodeId: z.string(), branch: z.string(), commitSha: z.string(), createdAt: z.string(), model: z.string(),
-  adapter: z.enum(['openai-compatible', 'ollama']), decision: z.union([manualStatus, z.literal('insufficient')]),
+  adapter: z.enum(['openai-compatible', 'ollama']), endpoint: z.string().optional(), scopeComplete: z.boolean().optional(), decision: z.union([manualStatus, z.literal('insufficient')]),
   summary: z.string(), evidence: z.array(z.strictObject({ path: z.string(), startLine: z.number().int(), endLine: z.number().int() })),
   inputs: z.array(z.strictObject({ path: z.string(), blobSha: z.string() })), inputFingerprint: z.string(),
   nextAction: z.string().nullable(), adviceBasisFingerprint: z.string(),

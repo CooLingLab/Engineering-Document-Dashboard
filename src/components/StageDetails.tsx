@@ -1,13 +1,13 @@
 import { getBranchState, type DocumentChoice, type DocumentSnapshot, type ManualStatus, type ProjectConfig } from '../domain/project';
 import type { DocumentIndex } from '../documents/match';
 import { useState } from 'react';
-import { deriveNodeView, setDocumentChoice, setManualStatus } from '../workflow/status';
+import { adviceBasisKey, deriveNodeView, setDocumentChoice, setManualStatus } from '../workflow/status';
 import { githubFileUrl, MarkdownReader } from './MarkdownReader';
 import { statusLabels } from './StageNode';
 
-export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; onChangeConfig?: (config: ProjectConfig) => void };
+export type StageDetailsProps = { config: ProjectConfig; snapshot: DocumentSnapshot; nodeId: string; documentIndex: DocumentIndex; beginnerMode: boolean; aiEnabled?: boolean; onChangeConfig?: (config: ProjectConfig) => void };
 
-export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, onChangeConfig }: StageDetailsProps) {
+export function StageDetails({ config, snapshot, nodeId, documentIndex, beginnerMode, aiEnabled = false, onChangeConfig }: StageDetailsProps) {
   const [selectedPath, setSelectedPath] = useState<string>();
   const [copyMessage, setCopyMessage] = useState('');
   const node = config.graph.nodes.find((item) => item.id === nodeId);
@@ -19,7 +19,9 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
   const prompt = node.promptIds.map((id) => config.template?.prompts[id]).find(Boolean);
   const branch = snapshot.ref?.name;
   const state = getBranchState(config, branch ?? '');
-  const view = deriveNodeView(config, snapshot, nodeId, false);
+  const view = deriveNodeView(config, snapshot, nodeId, aiEnabled);
+  const analysis = Object.hasOwn(state.analyses, nodeId) ? state.analyses[nodeId] : undefined;
+  const adviceCurrent = Boolean(branch && analysis?.adviceBasisFingerprint === adviceBasisKey(config, branch));
   const manual = Object.hasOwn(state.manualStatuses, nodeId) ? state.manualStatuses[nodeId] : '';
 
   async function copyPrompt() {
@@ -33,8 +35,17 @@ export function StageDetails({ config, snapshot, nodeId, documentIndex, beginner
 
   return (
     <section className="stage-details" role="region" aria-label={`${node.title}详情`}>
-      <div className="detail-heading"><div><span className="section-kicker">STAGE DETAILS</span><h2>{node.title}</h2></div><span className="status-chip">{statusLabels[view.status]}{view.source === 'manual' ? ' · 手动' : ''}</span></div>
+      <div className="detail-heading"><div><span className="section-kicker">STAGE DETAILS</span><h2>{node.title}</h2></div><span className="status-chip">{statusLabels[view.status]}{view.source === 'manual' ? ' · 手动' : view.source === 'ai' ? ' · 文档分析' : ''}</span></div>
       <label className="manual-status">手动状态<select aria-label="手动状态" value={manual} disabled={!branch || !onChangeConfig} onChange={(event) => { if (branch && onChangeConfig) onChangeConfig(setManualStatus(config, branch, nodeId, (event.target.value || null) as ManualStatus | null)); }}><option value="">未标记</option><option value="not-started">未开始</option><option value="in-progress">进行中</option><option value="done">已完成</option><option value="deferred">暂缓</option></select></label>
+      {aiEnabled && analysis && <div className="analysis-result"><strong>根据文档的分析 · {analysis.decision === 'insufficient' ? '信息不足' : statusLabels[analysis.decision]}</strong>
+        <p>{analysis.summary}</p><small>{new Date(analysis.createdAt).toLocaleString()} · {analysis.model}{analysis.endpoint ? ` · ${analysis.endpoint}` : ''} · {view.analysis === 'stale' ? '文档依据已变化，结果已过期' : '基于当前文档'}{analysis.scopeComplete === false ? ' · 仅分析了部分文档，结果仅供参考' : ''}{!adviceCurrent ? ' · 建议依据已变化' : ''}</small>
+        {analysis.evidence.length > 0 && <ul>{analysis.evidence.map((evidence, index) => {
+          const repo = snapshot.repository;
+          const path = evidence.path.split('/').map(encodeURIComponent).join('/');
+          const link = `https://github.com/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/blob/${encodeURIComponent(analysis.commitSha)}/${path}#L${evidence.startLine}-L${evidence.endLine}`;
+          return <li key={`${evidence.path}-${index}`}><a href={link} target="_blank" rel="noreferrer noopener">{evidence.path} · 第 {evidence.startLine}–{evidence.endLine} 行</a></li>;
+        })}</ul>}
+        {analysis.nextAction && view.analysis === 'fresh' && adviceCurrent && <p>建议：{analysis.nextAction}</p>}</div>}
       {beginnerMode && <div className="guidance-card"><strong>✦ 为什么要做这一步？</strong><p>{node.guidance.why}</p><p>{node.guidance.action}</p><ul>{node.guidance.checks.map((check) => <li key={check}>{check}</li>)}</ul></div>}
       <div className="detail-grid">
         <div className="document-panel"><div className="panel-heading"><h3>相关文档</h3><span>{matches.length} 项建议</span></div>

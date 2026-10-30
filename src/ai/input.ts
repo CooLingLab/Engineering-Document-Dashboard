@@ -5,7 +5,7 @@ import { adviceBasisKey, analysisInputKey } from '../workflow/status';
 export type AnalysisInput = {
   nodeId: string; branch: string; commitSha: string; inputFingerprint: string; adviceBasisFingerprint: string;
   guidance: StageGuidance; manualStatus: ManualStatus | null; documentChoices: Record<string, DocumentChoice>;
-  documents: { path: string; blobSha: string; lines: string[] }[];
+  documents: { path: string; blobSha: string; lines: string[] }[]; scopeComplete: boolean;
 };
 export class InputBudgetError extends Error {
   constructor(public required: number, public allowed: number) {
@@ -13,21 +13,24 @@ export class InputBudgetError extends Error {
     this.name = 'InputBudgetError';
   }
 }
-export function buildAnalysisInput(config: ProjectConfig, snapshot: DocumentSnapshot, nodeId: string, maxInputChars: number): AnalysisInput {
+export function buildAnalysisInput(config: ProjectConfig, snapshot: DocumentSnapshot, nodeId: string, maxInputChars: number, excludedPaths: readonly string[] = []): AnalysisInput {
   const node = config.graph.nodes.find((item) => item.id === nodeId);
   if (!node || !snapshot.ref || snapshot.repository.id !== config.repository.id) throw new Error('当前环节或分支不可分析。');
   if (!Number.isSafeInteger(maxInputChars) || maxInputChars < 1) throw new Error('分析字符上限无效。');
   const state = getBranchState(config, snapshot.ref.name);
-  const paths = new Set(indexDocuments(config, snapshot).matches.filter((match) => match.nodeId === nodeId && match.kind === 'found').flatMap((match) => match.paths));
+  const matches = indexDocuments(config, snapshot).matches.filter((match) => match.nodeId === nodeId);
+  const paths = new Set(matches.filter((match) => match.kind === 'found').flatMap((match) => match.paths));
+  const excluded = new Set(excludedPaths);
   const choices: Record<string, DocumentChoice> = {};
   for (const item of config.documentRules.expected.filter((expected) => expected.nodeId === nodeId)) {
-    if (Object.hasOwn(state.documentChoices, item.id)) Object.defineProperty(choices, item.id, { value: state.documentChoices[item.id], enumerable: true, configurable: true, writable: true });
+    const match = matches.find((value) => value.documentId === item.id);
+    if (!match?.paths.some((path) => excluded.has(path)) && Object.hasOwn(state.documentChoices, item.id)) Object.defineProperty(choices, item.id, { value: state.documentChoices[item.id], enumerable: true, configurable: true, writable: true });
   }
   const input: AnalysisInput = {
     nodeId, branch: snapshot.ref.name, commitSha: snapshot.ref.commitSha,
     inputFingerprint: analysisInputKey(config, snapshot, nodeId), adviceBasisFingerprint: adviceBasisKey(config, snapshot.ref.name),
     guidance: structuredClone(node.guidance), manualStatus: Object.hasOwn(state.manualStatuses, nodeId) ? state.manualStatuses[nodeId] : null,
-    documentChoices: choices, documents: snapshot.documents.filter((document) => paths.has(document.path))
+    documentChoices: choices, scopeComplete: ![...paths].some((path) => excluded.has(path)), documents: snapshot.documents.filter((document) => paths.has(document.path) && !excluded.has(document.path))
       .map((document) => ({ path: document.path, blobSha: document.blobSha, lines: document.content.split(/\r?\n/) })),
   };
   const required = JSON.stringify(input).length;

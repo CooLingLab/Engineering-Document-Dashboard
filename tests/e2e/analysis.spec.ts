@@ -1,0 +1,50 @@
+import { expect, test } from '@playwright/test';
+
+test('analysis requires confirmation, preserves manual status, and becomes stale when a document changes', async ({ page }) => {
+  let modelRequests = 0;
+  let blob = 'blob-1';
+  let text = '# 目标\n帮助新手了解下一步';
+  await page.route('https://api.github.com/**', async (route) => {
+    const url = new URL(route.request().url());
+    const size = Buffer.byteLength(text);
+    let body: unknown;
+    if (url.pathname === '/repos/fixture/demo') body = { id: 123, name: 'demo', owner: { login: 'fixture' }, default_branch: 'main' };
+    else if (url.pathname.endsWith('/branches')) body = [{ name: 'main' }];
+    else if (url.pathname.includes('/commits/')) body = { sha: blob === 'blob-1' ? 'commit1' : 'commit2' };
+    else if (url.pathname.endsWith('/contents/docs/development')) body = [{ path: 'docs/development/01-vision.md', type: 'file', sha: blob, size }];
+    else if (url.pathname.endsWith('/01-vision.md')) body = { type: 'file', path: 'docs/development/01-vision.md', sha: blob, size, encoding: 'base64', content: Buffer.from(text).toString('base64') };
+    else return route.fulfill({ status: 404, json: {} });
+    return route.fulfill({ status: 200, json: body });
+  });
+  await page.route('https://model.example/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': '*' } });
+    modelRequests++;
+    const data = route.request().postDataJSON();
+    expect(data).not.toHaveProperty('tools');
+    expect(JSON.stringify(data)).not.toContain('synthetic-model-key');
+    const result = { nodeId: 'vision', decision: 'done', summary: '目标已经描述', evidence: [{ path: 'docs/development/01-vision.md', startLine: 2, endLine: 2 }], nextAction: '检查目标' };
+    return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, json: { choices: [{ message: { content: JSON.stringify(result) } }] } });
+  });
+  await page.goto('/');
+  await page.getByLabel('GitHub 仓库地址').fill('fixture/demo');
+  await page.getByRole('button', { name: /连接仓库/ }).click();
+  await expect(page.getByText('fixture/demo', { exact: true })).toBeVisible();
+  await page.getByLabel('手动状态').selectOption('in-progress');
+  await page.getByText(/文档分析设置/).click();
+  await page.getByLabel('分析方式').selectOption('openai-compatible');
+  await page.getByLabel('模型端点').fill('https://model.example/api');
+  await page.getByLabel('模型名称').fill('sample');
+  await page.getByLabel('模型密钥').fill('synthetic-model-key');
+  await page.getByRole('button', { name: '分析当前环节' }).click();
+  await expect(page.getByRole('region', { name: '分析范围预览' })).toContainText('01-vision.md');
+  expect(modelRequests).toBe(0);
+  await page.getByRole('button', { name: '确认发送并分析' }).click();
+  await expect(page.getByText('目标已经描述')).toBeVisible();
+  await expect(page.getByText('进行中 · 手动')).toBeVisible();
+  expect(modelRequests).toBe(1);
+  blob = 'blob-2'; text = '# 目标\n范围已经调整';
+  await page.getByRole('button', { name: '刷新文档' }).click();
+  await expect(page.getByText(/文档依据已变化/)).toBeVisible();
+  await expect(page.getByLabel('手动状态')).toHaveValue('in-progress');
+  expect(modelRequests).toBe(1);
+});
