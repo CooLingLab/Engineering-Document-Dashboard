@@ -171,3 +171,10 @@
 .document-item { flex-wrap: wrap; }
 .document-item select { max-width: 100%; min-width: 96px; }
 @media (max-width: 700px) { .document-item { align-items: flex-start; } .document-item select { flex: 1; min-width: 120px; } }
+
+.backup-manager { margin-top: 14px; padding: 14px; border: 1px solid #e3e8f2; border-radius: 12px; background: #fff; color: #7a88a0; font-size: 12px; }
+.backup-manager summary { cursor: pointer; font-weight: 650; color: #586a8a; }
+.backup-manager p { font-size: 11px; line-height: 1.6; }
+.backup-manager-item { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 10px 0; border-top: 1px solid #edf0f5; }
+.backup-manager-item > span { flex: 1; min-width: 170px; }
+@media (max-width: 700px) { .backup-manager-item button { min-height: 40px; } }
