@@ -21,6 +21,7 @@ import { deriveNodeView } from '../workflow/status';
 import { recommendNext } from '../workflow/recommend';
 import './app.css';
 import './components.css';
+import './explorer.css';
 
 export default function App() {
   const credentials = useMemo(() => new MemoryCredentials(), []);
