@@ -11,7 +11,7 @@ import { GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
 import { RefreshScheduler, type RefreshState } from '../github/refresh';
 import { useProject } from './useProject';
-import { devflowTemplate, DEVFLOW_TEMPLATE_ID, templates } from '../templates/catalog';
+import { devflowTemplate, DEVFLOW_TEMPLATE_ID } from '../templates/catalog';
 import { switchTemplate } from '../workflow/backup';
 import { FixedStageNavigator } from '../components/FixedStageNavigator';
 import { deriveNodeView } from '../workflow/status';
@@ -67,7 +67,7 @@ export default function App() {
     const previousToken = credentials.get('target');
     credentials.set('target', token || undefined);
     if (await session.connect(input)) {
-      setShowConnect(false); setDocumentRoot(session.getState().config?.documentRules.root ?? templates[0].documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
+      setShowConnect(false); setDocumentRoot(session.getState().config?.documentRules.root ?? devflowTemplate.documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
     } else credentials.set('target', previousToken);
   }
 
@@ -132,7 +132,7 @@ export default function App() {
           <div className="desktop-workflow-canvas"><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} documentIndex={documentIndex} documentChoices={getBranchState(config, snapshot.ref?.name ?? '').documentChoices} /></div>
           <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
           {selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)} />}
-        </> : <div className="route-preview" aria-label="AI 开发八阶段">{templates[0].graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
+        </> : <div className="route-preview" aria-label="AI 开发八阶段">{devflowTemplate.graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
         <div className="footer-note">✳ 你的文档留在原来的仓库中，我们只读取它们。</div>
       </div>
     </main>
