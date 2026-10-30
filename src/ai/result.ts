@@ -11,7 +11,8 @@ const resultSchema = z.strictObject({
 });
 
 function repeatsSource(text: string, input: AnalysisInput): boolean {
-  const documents = input.documents.map((document) => document.lines.join('\n'));
+  text = text.normalize('NFKC').replace(/\s/g, '');
+  const documents = input.documents.map((document) => document.lines.join('\n').normalize('NFKC').replace(/\s/g, ''));
   if (documents.some((document) => document.trim().length >= 8 && text.includes(document.trim()))) return true;
   const size = 32;
   if (text.length < size) return false;

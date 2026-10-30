@@ -52,16 +52,20 @@ export function useProject(reader: GitHubReader) {
         else throw error;
       }
       if (pending.generation !== generation.current) return false;
-      branch = branches.length ? repository.defaultBranch || branches[0] : null;
+      const preserveDraft = Boolean(originalConfig && originalConfig.repository.id === repository.id);
+      const metadataChanged = Boolean(preserveDraft && originalConfig && (originalConfig.repository.owner !== repository.owner || originalConfig.repository.name !== repository.name || originalConfig.repository.defaultBranch !== repository.defaultBranch));
+      const priorBranch = preserveDraft ? current.current.selectedBranch : null;
+      if (priorBranch && !branches.includes(priorBranch)) throw new GitHubError('not-found-or-no-access', '原分支不存在或无法读取，已保留当前草稿。');
+      branch = priorBranch ?? (branches.length ? repository.defaultBranch || branches[0] : null);
       dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
-      const config = createProject(repository, templates[0]);
+      const config = preserveDraft && originalConfig ? { ...originalConfig, repository } : createProject(repository, templates[0]);
       const snapshot = branch ? await loadDocumentSnapshot(reader, repository, branch, config.documentRules.root, pending.controller.signal)
         : emptySnapshot(repository, config.documentRules.root);
       if (pending.generation === generation.current && current.current.config !== originalConfig) {
         dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, error: '连接期间流程发生修改，已保留本地草稿；请保存后再切换。' });
         return false;
       }
-      dispatch({ type: 'connected', generation: pending.generation, repositoryId, branch, config, snapshot, branches });
+      dispatch({ type: 'connected', generation: pending.generation, repositoryId, branch, config, snapshot, branches, preserveDraft, metadataChanged });
       return pending.generation === generation.current;
     } catch (error) {
       if (!pending.controller.signal.aborted) dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch,
@@ -170,7 +174,7 @@ export function useProject(reader: GitHubReader) {
     Object.defineProperty(next.branches, record.branch, { value: branch, enumerable: true, writable: true, configurable: true });
     dispatch({ type: 'config', config: next });
   }
-  return { state, connect, selectBranch, refresh, applyConfig, applyLoadedConfig,
+  return { state, getState: () => current.current, connect, selectBranch, refresh, applyConfig, applyLoadedConfig,
     selectNode: (nodeId: string | null) => dispatch({ type: 'node', nodeId }),
     setError: (error: string | null) => dispatch({ type: 'error', error }),
     markSaved: (config: ProjectConfig) => dispatch({ type: 'saved', config }), commitAnalysis };

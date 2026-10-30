@@ -65,11 +65,11 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   async function connect(input: string, token: string) {
-    if (dirty && !window.confirm('当前流程有尚未同步的修改。要保留它们，请先取消并在“配置同步”中保存；切换项目会丢失这些修改。确定继续切换吗？')) return;
+    if (dirty && !window.confirm('当前流程有尚未同步的修改。重新连接同一仓库会保留草稿；切换到其他仓库会丢失草稿，请先保存。确定继续吗？')) return;
     const previousToken = credentials.get('target');
     credentials.set('target', token || undefined);
     if (await session.connect(input)) {
-      setShowConnect(false); setEditing(false); setHistory([]); setDocumentRoot(templates[0].documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
+      setShowConnect(false); setEditing(false); setHistory([]); setDocumentRoot(session.getState().config?.documentRules.root ?? templates[0].documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
     } else credentials.set('target', previousToken);
   }
 

@@ -67,12 +67,16 @@ export class ConfigRepositoryGateway {
     const url = new URL(`${this.#path()}/contents/projects/${id}.json`);
     if (this.source.branch) url.searchParams.set('ref', this.source.branch);
     const response = await this.#request(url.toString(), { method: 'GET', signal });
-    if (response.status === 409) return null;
+    if (response.status === 409) { this.source.branch = null; return null; }
     if (response.status === 404) {
       const root = new URL(`${this.#path()}/contents`);
       if (this.source.branch) root.searchParams.set('ref', this.source.branch);
       const checked = await this.#request(root.toString(), { method: 'GET', signal });
-      if (checked.status === 409) return null;
+      if (checked.status === 409) { this.source.branch = null; return null; }
+      if (checked.status === 404) {
+        const commits = await this.#request(`${this.#path()}/commits?per_page=1`, { method: 'GET', signal });
+        if (commits.status === 409) { this.source.branch = null; return null; }
+      }
       if (!checked.ok || !Array.isArray(await checked.json())) throw new Error('无法确认配置仓库或分支可读，请检查权限和分支。');
       return null;
     }

@@ -38,6 +38,7 @@ export class AnalysisController {
     const key = this.#options.getModelKey();
     this.#running = true;
     try {
+      const results: AnalysisRecord[] = [];
       this.#options.onProgress?.(0, preview.inputs.length);
       for (let i = 0; i < preview.inputs.length; i++) {
         if (generation !== this.#generation) throw new DOMException('已取消分析', 'AbortError');
@@ -63,9 +64,11 @@ export class AnalysisController {
         }
         if (generation !== this.#generation) throw new DOMException('已取消分析', 'AbortError');
         const record = validateAnalysis(raw, input, preview.settings, new Date());
-        this.#options.commit(preview.repositoryId, record);
+        results.push(record);
         this.#options.onProgress?.(i + 1, preview.inputs.length);
       }
+      if (generation !== this.#generation) throw new DOMException('已取消分析', 'AbortError');
+      for (const record of results) this.#options.commit(preview.repositoryId, record);
     } finally { this.#running = false; this.#abort = null; }
   }
   cancel() { this.#generation++; this.#abort?.abort(); }

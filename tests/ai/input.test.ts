@@ -32,4 +32,13 @@ describe('analysis input', () => {
     expect(input.documents).toEqual([]);
     expect(input.scopeComplete).toBe(false);
   });
+  it('marks the scope partial if another associated document cannot be read', () => {
+    const config = makeConfig();
+    config.documentRules.expected.push({ id: 'extra', nodeId: 'requirements', fileName: 'extra.md' });
+    const snapshot = makeSnapshot({ documents: [{ path: 'docs/development/02-requirements.md', blobSha: 'sha', content: '用户需求', size: 12 }],
+      issues: [{ path: 'docs/development/extra.md', kind: 'too-large', message: '文档过大' }] });
+    const input = buildAnalysisInput(config, snapshot, 'requirements', 12_000);
+    expect(input.documents).toHaveLength(1);
+    expect(input.scopeComplete).toBe(false);
+  });
 });

@@ -173,6 +173,17 @@ describe('project session', () => {
     expect(result.current.state.config?.repository).toMatchObject({ id: 1, owner: 'example', name: 'first' });
     expect(result.current.state.dirty).toBe(true);
   });
+  it('reconnects a renamed repository by stable ID without discarding its unsynced route', async () => {
+    const { reader } = fakeReader();
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    vi.mocked(reader.getRepository).mockResolvedValueOnce({ id: 1, owner: 'example', name: 'renamed', defaultBranch: 'main' });
+    await act(async () => { await result.current.connect('example/renamed'); });
+    expect(result.current.state.config?.repository.name).toBe('renamed');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(result.current.state.dirty).toBe(true);
+  });
   it('clears previously read document contents when repository access is revoked', async () => {
     const { reader } = fakeReader();
     vi.mocked(reader.listDirectory).mockResolvedValue([{ type: 'file', path: 'docs/development/02-requirements.md', size: 3, sha: 'blob' }]);

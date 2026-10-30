@@ -83,7 +83,7 @@ describe('analysis controller', () => {
     await vi.waitFor(() => expect(analyze).toHaveBeenCalledTimes(2));
     controller.cancel();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it('times out an unresponsive adapter without committing a late response', async () => {

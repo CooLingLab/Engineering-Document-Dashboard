@@ -30,7 +30,9 @@ export function buildAnalysisInput(config: ProjectConfig, snapshot: DocumentSnap
     nodeId, branch: snapshot.ref.name, commitSha: snapshot.ref.commitSha,
     inputFingerprint: analysisInputKey(config, snapshot, nodeId), adviceBasisFingerprint: adviceBasisKey(config, snapshot.ref.name),
     guidance: structuredClone(node.guidance), manualStatus: Object.hasOwn(state.manualStatuses, nodeId) ? state.manualStatuses[nodeId] : null,
-    documentChoices: choices, scopeComplete: ![...paths].some((path) => excluded.has(path)), documents: snapshot.documents.filter((document) => paths.has(document.path) && !excluded.has(document.path))
+    documentChoices: choices, scopeComplete: ![...paths].some((path) => excluded.has(path)) &&
+      !matches.some((match) => match.kind === 'unavailable' || match.kind === 'ambiguous') &&
+      !snapshot.issues.some((issue) => issue.kind === 'incomplete'), documents: snapshot.documents.filter((document) => paths.has(document.path) && !excluded.has(document.path))
       .map((document) => ({ path: document.path, blobSha: document.blobSha, lines: document.content.split(/\r?\n/) })),
   };
   const required = JSON.stringify(input).length;

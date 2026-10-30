@@ -60,6 +60,20 @@ describe('configuration repository gateway', () => {
     const fetcher = vi.fn(async (url: RequestInfo | URL) => String(url).includes('/contents') ? response({}, 404) : metadata.clone());
     await expect(setup(fetcher).loadConfiguration(123)).rejects.toThrow(/无法确认/);
   });
+  it('recognizes GitHub’s 404 contents and 409 commits responses for an empty configuration repository', async () => {
+    const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') return response({ content: { sha: 'first' } }, 201);
+      if (String(url).includes('/contents')) return response({ message: 'This repository is empty.' }, 404);
+      if (String(url).includes('/commits')) return response({}, 409);
+      return metadata.clone();
+    });
+    const gateway = setup(fetcher);
+    expect((await gateway.loadConfiguration(123)).config).toBeNull();
+    expect(await gateway.saveConfiguration(makeConfig(), null)).toEqual({ kind: 'saved', fileSha: 'first' });
+    const [, options] = fetcher.mock.calls.find(([, init]) => init?.method === 'PUT')!;
+    expect(JSON.parse(String(options?.body))).not.toHaveProperty('branch');
+    expect(gateway.source.branch).toBe('main');
+  });
 
   it('loads a large-file response through its immutable blob SHA', async () => {
     const config = makeConfig();

@@ -76,7 +76,7 @@ export function ModelPanel({ config, snapshot, selectedNodeId, credentials, fetc
         {running && <button type="button" className="secondary-button" onClick={() => controller.cancel()}>取消分析</button>}{running && <span>{progress}</span>}</div>
       {preview && !running && <div className="analysis-preview" role="region" aria-label="分析范围预览">
         <strong>确认分析范围</strong><p>将向 {preview.settings.endpoint} 发送以下环节的关联文档正文：</p>
-        {preview.inputs.map((input, index) => <div key={input.nodeId}><strong>{preview.titles[index]}</strong>{!input.scopeComplete && <p>部分文档未选，结果只作为参考。</p>}{input.documents.length
+        {preview.inputs.map((input, index) => <div key={input.nodeId}><strong>{preview.titles[index]}</strong>{!input.scopeComplete && <p>部分文档未选或无法完整读取，结果只作为参考。</p>}{input.documents.length
           ? <ul>{input.documents.map((document) => <li key={document.path}>{document.path}（{document.lines.length} 行）</li>)}</ul>
           : <p>没有关联文档；此环节将直接标记为信息不足，不发送模型请求。</p>}</div>)}
         <button type="button" className="secondary-button" onClick={() => void run()}>确认发送并分析</button>{' '}
