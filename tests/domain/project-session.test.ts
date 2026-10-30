@@ -197,4 +197,17 @@ describe('project session', () => {
     expect(result.current.state.config).not.toBeNull();
     expect(result.current.state.error).toBe('授权失效');
   });
+  it('offers newly available branches when the selected branch was deleted', async () => {
+    const { reader } = fakeReader();
+    vi.mocked(reader.listBranches).mockResolvedValueOnce(['main']).mockResolvedValueOnce(['develop']);
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.state.selectedBranch).toBe('main');
+    expect(result.current.state.branches).toContain('develop');
+    await act(async () => { await result.current.selectBranch('develop'); });
+    expect(result.current.state.selectedBranch).toBe('develop');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+  });
 });

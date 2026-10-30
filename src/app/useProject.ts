@@ -115,6 +115,7 @@ export function useProject(reader: GitHubReader) {
     let branch = current.current.selectedBranch;
     const repositoryId = config.repository.id;
     const pending = begin(repositoryId, branch);
+    let availableBranches: string[] | undefined;
     try {
       const repository = await reader.getRepository(config.repository, pending.controller.signal);
       if (repository.id !== repositoryId) throw new GitHubError('not-found-or-no-access', '仓库身份发生变化，请重新连接。');
@@ -124,6 +125,7 @@ export function useProject(reader: GitHubReader) {
         if (error instanceof GitHubError && error.kind === 'empty-repository') branches = [];
         else throw error;
       }
+      availableBranches = branches;
       if (branch && !branches.includes(branch)) throw new GitHubError('not-found-or-no-access', '当前分支不存在或无法读取，已保留原有状态。');
       branch ??= branches.length ? repository.defaultBranch && branches.includes(repository.defaultBranch) ? repository.defaultBranch : branches[0] : null;
       dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
@@ -142,7 +144,7 @@ export function useProject(reader: GitHubReader) {
       if (!pending.controller.signal.aborted) {
         const clearDocuments = inaccessible(error);
         if (clearDocuments && pending.generation === generation.current) reader.clearCache();
-        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, clearDocuments,
+        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, clearDocuments, branches: availableBranches,
           error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
       }
       if (throwOnError) throw error;

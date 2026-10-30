@@ -16,7 +16,7 @@ export type ProjectAction =
   | { type: 'scope'; generation: number; repositoryId: number; branch: string | null }
   | { type: 'connected'; generation: number; repositoryId: number; branch: string | null; config: ProjectConfig; snapshot: DocumentSnapshot; branches: string[]; preserveDraft: boolean; metadataChanged: boolean }
   | { type: 'loaded'; generation: number; repositoryId: number; branch: string | null; snapshot: DocumentSnapshot; config?: ProjectConfig; branches?: string[] }
-  | { type: 'failed'; generation: number; repositoryId: number | null; branch: string | null; error: string; clearDocuments?: boolean }
+  | { type: 'failed'; generation: number; repositoryId: number | null; branch: string | null; error: string; clearDocuments?: boolean; branches?: string[] }
   | { type: 'config'; config: ProjectConfig }
   | { type: 'node'; nodeId: string | null }
   | { type: 'error'; error: string | null }
@@ -32,7 +32,7 @@ export function projectReducer(state: ProjectSession, action: ProjectAction): Pr
   if (action.type === 'error') return { ...state, error: action.error };
   if (action.type === 'saved') return state.config === action.config ? { ...state, dirty: false } : state;
   if (action.generation !== state.generation || action.repositoryId !== state.requestRepositoryId || action.branch !== state.requestBranch) return state;
-  if (action.type === 'failed') return { ...state, busy: false, error: action.error,
+  if (action.type === 'failed') return { ...state, busy: false, error: action.error, branches: action.branches ?? state.branches,
     snapshot: action.clearDocuments && state.snapshot && state.config?.repository.id === action.repositoryId
       ? { ...state.snapshot, documents: [], issues: [{ path: state.snapshot.root, kind: 'incomplete', message: '仓库或分支无法访问，已清除页面中的文档缓存。' }] }
       : state.snapshot };

@@ -51,4 +51,11 @@ describe('stage status', () => {
     config.branches.main.analyses.requirements = makeAnalysis({ decision: 'done', scopeComplete: false, inputFingerprint: analysisInputKey(config, snapshot, 'requirements') });
     expect(deriveNodeView(config, snapshot, 'requirements', true)).toMatchObject({ status: 'unknown', source: 'none' });
   });
+  it('does not reuse a previously complete analysis when a later scan is incomplete', () => {
+    const snapshot = makeSnapshot({ documents: [{ path: 'docs/development/02-requirements.md', blobSha: 'same', content: '需求内容', size: 12 }] });
+    const config = setManualStatus(makeConfig(), 'main', 'requirements', null);
+    config.branches.main.analyses.requirements = makeAnalysis({ decision: 'done', scopeComplete: true, inputFingerprint: analysisInputKey(config, snapshot, 'requirements') });
+    const incomplete = { ...snapshot, issues: [{ path: 'docs/development', kind: 'incomplete' as const, message: '扫描未完成' }] };
+    expect(deriveNodeView(config, incomplete, 'requirements', true)).toMatchObject({ status: 'unknown', source: 'none', analysis: 'stale' });
+  });
 });

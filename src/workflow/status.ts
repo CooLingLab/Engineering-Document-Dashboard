@@ -12,7 +12,8 @@ export function analysisInputKey(config: ProjectConfig, snapshot: DocumentSnapsh
   const expected = config.documentRules.expected.filter((item) => item.nodeId === nodeId)
     .map((item) => ({ id: item.id, fileName: item.fileName })).sort((a, b) => a.id.localeCompare(b.id));
   return JSON.stringify({ analysisRuleVersion: 1, node: node && { id: node.id, title: node.title, guidance: node.guidance },
-    template: config.template && { id: config.template.id, version: config.template.version }, root: snapshot.root, expected, matches, documents });
+    template: config.template && { id: config.template.id, version: config.template.version }, root: snapshot.root, expected, matches, documents,
+    ...(snapshot.issues.some((issue) => issue.kind === 'incomplete') ? { scanIncomplete: true } : {}) });
 }
 
 export function adviceBasisKey(config: ProjectConfig, branch: string): string {

@@ -60,3 +60,27 @@ test('an initially empty repository can discover its first branch without losing
   await expect(page.getByRole('button', { name: '查看复盘' })).toBeVisible();
   await expect(page.getByText('当前项目 · 有未同步修改')).toBeVisible();
 });
+
+test('a deleted branch can be replaced with a newly available branch without losing the draft', async ({ page }) => {
+  let replaced = false;
+  await page.route('https://api.github.com/**', async (route) => {
+    const url = new URL(route.request().url());
+    let body: unknown;
+    if (url.pathname === '/repos/fixture/demo') body = { id: 123, name: 'demo', owner: { login: 'fixture' }, default_branch: replaced ? 'develop' : 'main' };
+    else if (url.pathname.endsWith('/branches')) body = [{ name: replaced ? 'develop' : 'main' }];
+    else if (url.pathname.includes('/commits/')) body = { sha: 'commit' };
+    else if (url.pathname.endsWith('/contents/docs/development')) body = [];
+    else return route.fulfill({ status: 404, json: {} });
+    return route.fulfill({ status: 200, json: body });
+  });
+  await page.goto('/');
+  await page.getByLabel('GitHub 仓库地址').fill('fixture/demo');
+  await page.getByRole('button', { name: /连接仓库/ }).click();
+  await page.getByLabel('手动状态').selectOption('done');
+  replaced = true;
+  await page.getByRole('button', { name: '刷新文档' }).click();
+  await expect(page.getByRole('alert')).toContainText('已保留原有状态');
+  await page.getByLabel('当前分支').selectOption('develop');
+  await expect(page.getByLabel('当前分支')).toHaveValue('develop');
+  await expect(page.getByText('当前项目 · 有未同步修改')).toBeVisible();
+});
