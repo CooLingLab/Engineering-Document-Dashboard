@@ -49,4 +49,30 @@ describe('editing a development flow', () => {
     expect(next.backups.at(-1)?.graph.nodes.map((node) => node.id)).toEqual(['requirements', 'custom']);
     expect(next.backups.at(-1)?.branches.main.manualStatuses.requirements).toBe('done');
   });
+
+  it('reorders stages without silently changing their dependency edges', () => {
+    const withNode = applyGraphCommand(makeConfig(), { type: 'add-node', node: extra });
+    const linked = applyGraphCommand(withNode, { type: 'add-edge', edge: { id: 'a', source: 'requirements', target: 'custom' } });
+    const reordered = applyGraphCommand(linked, { type: 'reorder-nodes', ids: ['custom', 'requirements'] });
+    expect(reordered.graph.nodes.find((node) => node.id === 'custom')?.order).toBe(0);
+    expect(reordered.graph.nodes.find((node) => node.id === 'requirements')?.order).toBe(1);
+    expect(reordered.graph.edges).toEqual(linked.graph.edges);
+    expect(linked.graph.nodes.find((node) => node.id === 'custom')?.order).toBe(1);
+    expect(() => applyGraphCommand(linked, { type: 'reorder-nodes', ids: ['custom', 'custom'] })).toThrow();
+  });
+
+  it('automatically lays out branches and cycles without losing nodes or links', () => {
+    const withNode = applyGraphCommand(makeConfig(), { type: 'add-node', node: extra });
+    const linked = applyGraphCommand(withNode, { type: 'add-edge', edge: { id: 'a', source: 'requirements', target: 'custom' } });
+    const layout = applyGraphCommand(linked, { type: 'auto-layout' });
+    const start = layout.graph.nodes.find((node) => node.id === 'requirements')!;
+    const end = layout.graph.nodes.find((node) => node.id === 'custom')!;
+    expect(end.position.x).toBeGreaterThan(start.position.x);
+    const cyclic = applyGraphCommand(linked, { type: 'add-edge', edge: { id: 'b', source: 'custom', target: 'requirements' } });
+    const arrangedCycle = applyGraphCommand(cyclic, { type: 'auto-layout' });
+    expect(arrangedCycle.graph.nodes).toHaveLength(2);
+    expect(arrangedCycle.graph.nodes.every((node) => Number.isFinite(node.position.x) && Number.isFinite(node.position.y))).toBe(true);
+    expect(arrangedCycle.graph.edges).toEqual(cyclic.graph.edges);
+  });
+
 });

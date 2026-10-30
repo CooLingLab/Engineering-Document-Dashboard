@@ -98,7 +98,7 @@ export function SyncPanel({ config, dirty, credentials, fetcher, onLoaded, onSav
     finally { if (mounted.current) { setBusy(false); render((n) => n + 1); } }
   }
   void version;
-  return <details className="directory-settings"><summary>配置同步 · {dirty ? '有未同步修改' : '跨设备保存'}</summary>
+  return <details id="workflow-sync-panel" className="directory-settings"><summary>配置同步 · {dirty ? '有未同步修改' : '跨设备保存'}</summary>
     <p>连接你单独创建的配置仓库；仅在点击保存后写入，不主动保存文档正文或令牌。模型摘要可能复述文档内容，过滤无法保证完全识别；建议使用私有仓库并在保存前检查。</p>
     <form onSubmit={(event) => void connect(event)}>
       <label>配置仓库地址<input aria-label="配置仓库地址" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="owner/config-repository" /></label>
