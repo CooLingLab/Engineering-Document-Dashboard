@@ -36,4 +36,12 @@ describe('analysis evidence', () => {
     const result = validateAnalysis({ ...raw, evidence: [{ path: input.documents[0].path, startLine: 1, endLine: 1 }] }, heading, settings, new Date());
     expect(result.decision).toBe('insufficient');
   });
+  it('does not store a long verbatim passage repeated by the model', () => {
+    const passage = '这是一段来自私人项目文档的较长原文内容，包含产品目标和设计细节，应该通过引用查看而不是复制到配置仓库。';
+    const source = buildAnalysisInput(makeConfig(), makeSnapshot({ documents: [{ path: input.documents[0].path, blobSha: 'blob', content: `# 需求\n${passage}`, size: 200 }] }), 'requirements', 12_000);
+    const record = validateAnalysis({ ...raw, summary: passage, nextAction: passage }, source, settings, new Date());
+    expect(record.summary).not.toContain(passage);
+    expect(record.nextAction).toBeNull();
+    expect(record.evidence).toHaveLength(1);
+  });
 });

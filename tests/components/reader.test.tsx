@@ -4,6 +4,7 @@ import { MarkdownReader } from '../../src/components/MarkdownReader';
 import { StageDetails } from '../../src/components/StageDetails';
 import { indexDocuments } from '../../src/documents/match';
 import { makeConfig, makeSnapshot } from '../fixtures';
+import { setManualStatus } from '../../src/workflow/status';
 
 describe('safe read-only document display', () => {
   it('renders Markdown without executing HTML, dangerous links or remote images', () => {
@@ -56,5 +57,13 @@ describe('safe read-only document display', () => {
     expect(onChange.mock.calls[0][0].branches.main.manualStatuses.requirements).toBe('done');
     fireEvent.change(screen.getByLabelText('文档取舍：02-requirements.md'), { target: { value: 'later' } });
     expect(onChange.mock.calls[1][0].branches.main.documentChoices['requirements-doc']).toBe('later');
+  });
+  it('keeps a manual status but warns when its document basis has changed', () => {
+    const original = makeSnapshot({ documents: [{ path: 'docs/development/02-requirements.md', blobSha: 'old', content: '旧内容', size: 9 }] });
+    const config = setManualStatus(makeConfig(), 'main', 'requirements', 'done', original);
+    const updated = makeSnapshot({ documents: [{ ...original.documents[0], blobSha: 'new', content: '新内容' }] });
+    render(<StageDetails config={config} snapshot={updated} nodeId="requirements" documentIndex={indexDocuments(config, updated)} beginnerMode />);
+    expect(screen.getByText(/手动标记时的文档依据已变化/)).toBeInTheDocument();
+    expect(screen.getByText('已完成 · 手动')).toBeInTheDocument();
   });
 });

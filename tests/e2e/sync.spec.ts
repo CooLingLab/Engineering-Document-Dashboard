@@ -58,5 +58,13 @@ test('a second browser session can load a route saved to a separate configuratio
     await expect(other.getByText('已加载 GitHub 上的配置。')).toBeVisible();
     await expect(other.getByLabel('手动状态')).toHaveValue('done');
     expect(writes).toBe(1);
+    await page.getByLabel('手动状态').selectOption('in-progress');
+    await page.getByRole('button', { name: '保存到 GitHub' }).click();
+    await expect.poll(() => writes).toBe(2);
+    await other.getByLabel('手动状态').selectOption('deferred');
+    await other.getByRole('button', { name: '保存到 GitHub' }).click();
+    await expect(other.getByText(/远端配置已变化/).first()).toBeVisible();
+    await expect(other.getByLabel('手动状态')).toHaveValue('deferred');
+    expect(writes).toBe(2);
   } finally { await first.close(); await second.close(); }
 });

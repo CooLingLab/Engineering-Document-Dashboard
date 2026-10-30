@@ -43,11 +43,17 @@ function updateBranch(config: ProjectConfig, branch: string, update: (state: Bra
   return next;
 }
 
-export function setManualStatus(config: ProjectConfig, branch: string, nodeId: string, status: ManualStatus | null): ProjectConfig {
+export function setManualStatus(config: ProjectConfig, branch: string, nodeId: string, status: ManualStatus | null, snapshot?: DocumentSnapshot): ProjectConfig {
   if (!config.graph.nodes.some((node) => node.id === nodeId)) throw new Error('未找到这个开发环节。');
+  if (snapshot && (snapshot.repository.id !== config.repository.id || snapshot.ref?.name !== branch)) throw new Error('手动标记的文档依据与当前分支不符。');
   return updateBranch(config, branch, (state) => {
     if (status === null) delete state.manualStatuses[nodeId];
     else Object.defineProperty(state.manualStatuses, nodeId, { value: status, writable: true, enumerable: true, configurable: true });
+    if (state.manualBases) delete state.manualBases[nodeId];
+    if (status !== null && snapshot) {
+      state.manualBases ??= {};
+      Object.defineProperty(state.manualBases, nodeId, { value: analysisInputKey(config, snapshot, nodeId), writable: true, enumerable: true, configurable: true });
+    }
   });
 }
 

@@ -19,6 +19,7 @@ export type TemplateSnapshot = {
 };
 export type BranchState = {
   manualStatuses: Record<string, ManualStatus>;
+  manualBases?: Record<string, string>;
   documentChoices: Record<string, DocumentChoice>;
   analyses: Record<string, AnalysisRecord>;
 };

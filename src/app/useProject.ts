@@ -10,6 +10,9 @@ import { initialSession, projectReducer, type ProjectAction } from './projectRed
 function emptySnapshot(repository: Repository, root: string): DocumentSnapshot {
   return { repository, ref: null, root, documents: [], issues: [], fetchedAt: new Date().toISOString() };
 }
+function inaccessible(error: unknown): boolean {
+  return error instanceof GitHubError && ['unauthorized', 'forbidden', 'not-found-or-no-access'].includes(error.kind);
+}
 
 export function useProject(reader: GitHubReader) {
   const [state, reactDispatch] = useReducer(projectReducer, initialSession);
@@ -33,6 +36,7 @@ export function useProject(reader: GitHubReader) {
     let parsed;
     try { parsed = parseRepositoryInput(input); }
     catch (error) { dispatch({ type: 'error', error: error instanceof Error ? error.message : '仓库地址无效。' }); return false; }
+    const originalConfig = current.current.config;
     const pending = begin(null, null);
     let repositoryId: number | null = null;
     let branch: string | null = null;
@@ -53,6 +57,10 @@ export function useProject(reader: GitHubReader) {
       const config = createProject(repository, templates[0]);
       const snapshot = branch ? await loadDocumentSnapshot(reader, repository, branch, config.documentRules.root, pending.controller.signal)
         : emptySnapshot(repository, config.documentRules.root);
+      if (pending.generation === generation.current && current.current.config !== originalConfig) {
+        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, error: '连接期间流程发生修改，已保留本地草稿；请保存后再切换。' });
+        return false;
+      }
       dispatch({ type: 'connected', generation: pending.generation, repositoryId, branch, config, snapshot, branches });
       return pending.generation === generation.current;
     } catch (error) {
@@ -84,8 +92,12 @@ export function useProject(reader: GitHubReader) {
       dispatch({ type: 'loaded', generation: pending.generation, repositoryId, branch, snapshot, ...(replaceConfig ? { config } : {}) });
       return pending.generation === generation.current;
     } catch (error) {
-      if (!pending.controller.signal.aborted) dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch,
-        error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
+      if (!pending.controller.signal.aborted) {
+        const clearDocuments = inaccessible(error);
+        if (clearDocuments && pending.generation === generation.current) reader.clearCache();
+        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, clearDocuments,
+          error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
+      }
       if (throwOnError) throw error;
       return false;
     }
@@ -94,7 +106,43 @@ export function useProject(reader: GitHubReader) {
     if (current.current.config && branch) await load(branch, current.current.config);
   }
   async function refresh(throwOnError = false) {
-    if (current.current.config) await load(current.current.selectedBranch, current.current.config, false, throwOnError);
+    const config = current.current.config;
+    if (!config) return;
+    let branch = current.current.selectedBranch;
+    const repositoryId = config.repository.id;
+    const pending = begin(repositoryId, branch);
+    try {
+      const repository = await reader.getRepository(config.repository, pending.controller.signal);
+      if (repository.id !== repositoryId) throw new GitHubError('not-found-or-no-access', '仓库身份发生变化，请重新连接。');
+      let branches: string[];
+      try { branches = await reader.listBranches(repository, pending.controller.signal); }
+      catch (error) {
+        if (error instanceof GitHubError && error.kind === 'empty-repository') branches = [];
+        else throw error;
+      }
+      if (branch && !branches.includes(branch)) throw new GitHubError('not-found-or-no-access', '当前分支不存在或无法读取，已保留原有状态。');
+      branch ??= branches.length ? repository.defaultBranch && branches.includes(repository.defaultBranch) ? repository.defaultBranch : branches[0] : null;
+      dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
+      let snapshot = branch ? await loadDocumentSnapshot(reader, repository, branch, config.documentRules.root, pending.controller.signal)
+        : emptySnapshot(repository, config.documentRules.root);
+      const previous = current.current.snapshot;
+      if (previous && previous.repository.id === repositoryId && previous.ref?.name === branch && previous.root === snapshot.root) {
+        const oldDocuments = new Map(previous.documents.map((document) => [document.path, document]));
+        snapshot = { ...snapshot, documents: snapshot.documents.map((document) => {
+          const old = oldDocuments.get(document.path);
+          return old && old.blobSha === document.blobSha && old.size === document.size && old.content === document.content ? old : document;
+        }) };
+      }
+      dispatch({ type: 'loaded', generation: pending.generation, repositoryId, branch, snapshot, branches });
+    } catch (error) {
+      if (!pending.controller.signal.aborted) {
+        const clearDocuments = inaccessible(error);
+        if (clearDocuments && pending.generation === generation.current) reader.clearCache();
+        dispatch({ type: 'failed', generation: pending.generation, repositoryId, branch, clearDocuments,
+          error: error instanceof GitHubError ? error.message : '读取失败，请检查路径或网络后重试。' });
+      }
+      if (throwOnError) throw error;
+    }
   }
   async function applyConfig(config: ProjectConfig) {
     if (current.current.config?.repository.id !== config.repository.id) return false;
@@ -103,6 +151,15 @@ export function useProject(reader: GitHubReader) {
     }
     dispatch({ type: 'config', config });
     return true;
+  }
+  async function applyLoadedConfig(config: ProjectConfig) {
+    const repository = current.current.config?.repository;
+    if (!repository || repository.id !== config.repository.id) return false;
+    const sameIdentity = repository.owner === config.repository.owner && repository.name === config.repository.name && repository.defaultBranch === config.repository.defaultBranch;
+    const normalized = sameIdentity ? config : { ...config, repository: structuredClone(repository) };
+    const applied = await applyConfig(normalized);
+    if (applied && sameIdentity) dispatch({ type: 'saved', config: normalized });
+    return applied;
   }
   function commitAnalysis(repositoryId: number, record: AnalysisRecord) {
     const config = current.current.config;
@@ -113,7 +170,7 @@ export function useProject(reader: GitHubReader) {
     Object.defineProperty(next.branches, record.branch, { value: branch, enumerable: true, writable: true, configurable: true });
     dispatch({ type: 'config', config: next });
   }
-  return { state, connect, selectBranch, refresh, applyConfig,
+  return { state, connect, selectBranch, refresh, applyConfig, applyLoadedConfig,
     selectNode: (nodeId: string | null) => dispatch({ type: 'node', nodeId }),
     setError: (error: string | null) => dispatch({ type: 'error', error }),
     markSaved: (config: ProjectConfig) => dispatch({ type: 'saved', config }), commitAnalysis };

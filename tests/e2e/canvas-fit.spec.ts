@@ -16,6 +16,11 @@ test('adding a stage keeps it inside the visible flow canvas', async ({ page }) 
   await page.getByLabel('GitHub 仓库地址').fill('fixture/demo');
   await page.getByRole('button', { name: /连接仓库/ }).click();
   await expect(page.getByText('fixture/demo', { exact: true })).toBeVisible();
+  const requirements = page.locator('.react-flow__node').filter({ hasText: '需求' });
+  await expect(requirements).toContainText('缺 1 份');
+  await requirements.click();
+  await page.getByLabel('文档取舍：02-requirements.md').selectOption('not-needed');
+  await expect(requirements).not.toContainText('缺 1 份');
   await page.getByRole('button', { name: '编辑流程' }).click();
   await page.getByLabel('新环节名称').fill('复盘');
   await page.getByRole('button', { name: '添加环节' }).click();

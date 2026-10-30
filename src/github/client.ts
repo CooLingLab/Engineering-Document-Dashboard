@@ -39,7 +39,8 @@ export class GitHubReader {
     this.#unsubscribe = options.credentials.onChange((slot) => { if (slot === options.credentialSlot) this.#cache.clear(); });
   }
 
-  dispose(): void { this.#unsubscribe(); this.#cache.clear(); }
+  clearCache(): void { this.#cache.clear(); }
+  dispose(): void { this.#unsubscribe(); this.clearCache(); }
 
   #request(url: URL, signal: AbortSignal | undefined, etag: string | undefined, version: number): Promise<Response> {
     const pending = this.#queue.then(() => this.#doRequest(url, signal, etag, version));

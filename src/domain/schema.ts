@@ -50,6 +50,7 @@ const analysis = z.strictObject({
 });
 const branchState = z.strictObject({
   manualStatuses: safeRecord(manualStatus),
+  manualBases: safeRecord(z.string()).optional(),
   documentChoices: safeRecord(documentChoice),
   analyses: safeRecord(analysis),
 });

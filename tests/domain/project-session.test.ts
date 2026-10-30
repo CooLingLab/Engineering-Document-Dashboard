@@ -24,6 +24,7 @@ function fakeReader() {
       return pending ? pending.promise : { name: branch, commitSha: `${branch}-sha` };
     }),
     listDirectory: vi.fn(async () => []),
+    clearCache: vi.fn(),
   } as unknown as GitHubReader;
   return { reader, refs };
 }
@@ -133,5 +134,56 @@ describe('project session', () => {
     expect(branch.manualStatuses.requirements).toBe('done');
     expect(branch.analyses.requirements.decision).toBe('in-progress');
     expect(result.current.state.selectedBranch).toBe('main');
+  });
+
+  it('discovers the first branch of an initially empty repository on refresh while preserving the route', async () => {
+    const { reader } = fakeReader();
+    vi.mocked(reader.listBranches).mockResolvedValueOnce([]).mockResolvedValueOnce(['main']);
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    const edited = { ...result.current.state.config!, graph: { nodes: [], edges: [] } };
+    await act(async () => { await result.current.applyConfig(edited); });
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.state.selectedBranch).toBe('main');
+    expect(result.current.state.branches).toContain('main');
+    expect(result.current.state.config?.graph.nodes).toEqual([]);
+    expect(result.current.state.dirty).toBe(true);
+  });
+
+  it('keeps edits made while a new project connection is pending', async () => {
+    const { reader } = fakeReader();
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    const delayed = deferred<{ id: number; owner: string; name: string; defaultBranch: string }>();
+    vi.mocked(reader.getRepository).mockImplementationOnce(() => delayed.promise);
+    let pending!: Promise<boolean>;
+    act(() => { pending = result.current.connect('example/second'); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { delayed.resolve({ id: 2, owner: 'example', name: 'second', defaultBranch: 'main' }); await pending; });
+    expect(result.current.state.config?.repository.name).toBe('first');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(result.current.state.error).toMatch(/保留.*草稿/);
+  });
+  it('keeps the live GitHub repository address when loading a configuration saved before a rename', async () => {
+    const { reader } = fakeReader();
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    const old = { ...result.current.state.config!, repository: { ...result.current.state.config!.repository, owner: 'old-owner', name: 'old-name' } };
+    await act(async () => { await result.current.applyLoadedConfig(old); });
+    expect(result.current.state.config?.repository).toMatchObject({ id: 1, owner: 'example', name: 'first' });
+    expect(result.current.state.dirty).toBe(true);
+  });
+  it('clears previously read document contents when repository access is revoked', async () => {
+    const { reader } = fakeReader();
+    vi.mocked(reader.listDirectory).mockResolvedValue([{ type: 'file', path: 'docs/development/02-requirements.md', size: 3, sha: 'blob' }]);
+    (reader as unknown as { readFile: unknown }).readFile = vi.fn(async () => ({ path: 'docs/development/02-requirements.md', blobSha: 'blob', content: '私有内容', size: 3 }));
+    const { result } = renderHook(() => useProject(reader));
+    await act(async () => { await result.current.connect('example/first'); });
+    expect(result.current.state.snapshot?.documents).toHaveLength(1);
+    vi.mocked(reader.getRepository).mockRejectedValueOnce(new GitHubError('unauthorized', '授权失效'));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.state.snapshot?.documents).toEqual([]);
+    expect(result.current.state.config).not.toBeNull();
+    expect(result.current.state.error).toBe('授权失效');
   });
 });

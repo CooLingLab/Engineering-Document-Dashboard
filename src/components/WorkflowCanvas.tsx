@@ -1,17 +1,17 @@
 import { Background, Controls, ReactFlow, useNodesInitialized, useReactFlow, type NodeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useEffect, useRef, useState } from 'react';
-import type { NodeView, WorkflowGraph } from '../domain/project';
+import type { DocumentChoice, NodeView, WorkflowGraph } from '../domain/project';
 import type { DocumentIndex } from '../documents/match';
 import { StageNode, type StageFlowNode } from './StageNode';
 
 const nodeTypes = { stage: StageNode };
 export type WorkflowCanvasProps = {
   graph: WorkflowGraph; nodeViews: Record<string, NodeView>; selectedNodeId: string | null;
-  onSelectNode: (id: string) => void; onGraphChange?: (graph: WorkflowGraph) => void; documentIndex?: DocumentIndex;
+  onSelectNode: (id: string) => void; onGraphChange?: (graph: WorkflowGraph) => void; documentIndex?: DocumentIndex; documentChoices?: Record<string, DocumentChoice>;
 };
 
-export function WorkflowCanvas({ graph, nodeViews, selectedNodeId, onSelectNode, onGraphChange, documentIndex }: WorkflowCanvasProps) {
+export function WorkflowCanvas({ graph, nodeViews, selectedNodeId, onSelectNode, onGraphChange, documentIndex, documentChoices = {} }: WorkflowCanvasProps) {
   const [dragPositions, setDragPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [dimensions, setDimensions] = useState<Record<string, { width: number; height: number }>>({});
   const nodes: StageFlowNode[] = graph.nodes.map((node) => ({
@@ -19,7 +19,8 @@ export function WorkflowCanvas({ graph, nodeViews, selectedNodeId, onSelectNode,
     data: {
       title: node.title, order: node.order,
       view: nodeViews[node.id] ?? { status: 'unknown', source: 'none', analysis: 'absent' },
-      missing: documentIndex?.matches.filter((match) => match.nodeId === node.id && match.kind === 'missing').length ?? 0,
+      missing: documentIndex?.matches.filter((match) => match.nodeId === node.id && match.kind === 'missing' &&
+        (!Object.hasOwn(documentChoices, match.documentId) || documentChoices[match.documentId] === 'needed')).length ?? 0,
     },
   }));
 

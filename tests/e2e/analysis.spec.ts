@@ -44,7 +44,8 @@ test('analysis requires confirmation, preserves manual status, and becomes stale
   expect(modelRequests).toBe(1);
   blob = 'blob-2'; text = '# 目标\n范围已经调整';
   await page.getByRole('button', { name: '刷新文档' }).click();
-  await expect(page.getByText(/文档依据已变化/)).toBeVisible();
+  await expect(page.getByText(/结果已过期/)).toBeVisible();
+  await expect(page.getByText(/手动标记时的文档依据已变化/)).toBeVisible();
   await expect(page.getByLabel('手动状态')).toHaveValue('in-progress');
   expect(modelRequests).toBe(1);
 });
