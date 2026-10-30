@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.1",
+  "id": "devflow-v3",
+  "version": 3,
+  "name": "AI Development Lifecycle V3",
+  "scope": "per-feature",
+  "phases": [
+    {
+      "id": "idea",
+      "name": "Idea → Brainstorm",
+      "outputs": [
+        "docs/development/01-idea.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "domain",
+      "name": "Strategic DDD",
+      "outputs": [
+        "docs/development/02-domain.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "concept",
+      "name": "Concept Prototype → Validation",
+      "outputs": [
+        "docs/development/03-concept-validation.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "roadmap",
+      "name": "Roadmap",
+      "outputs": [
+        "docs/development/04-roadmap.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "ui",
+      "name": "UI Prototype",
+      "outputs": [
+        "docs/development/05-ui-prototype.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "spec",
+      "name": "Spec → Architecture / ADR → Plan",
+      "outputs": [
+        "docs/development/06-spec-plan.md"
+      ],
+      "skippable": true
+    },
+    {
+      "id": "build",
+      "name": "Harness + Agent Loop",
+      "outputs": [
+        "docs/development/07-implementation.md"
+      ],
+      "skippable": false
+    },
+    {
+      "id": "release",
+      "name": "Human Acceptance → Release",
+      "outputs": [
+        "docs/development/08-release.md"
+      ],
+      "skippable": false
+    }
+  ],
+  "rules": {
+    "topology": "fixed",
+    "skips": "explicit-manual-per-branch",
+    "allow_revisit": true,
+    "human_approval_required_for": [
+      "concept",
+      "release"
+    ],
+    "completion_requires_evidence": true,
+    "agent_must_not_approve_human_gates": true
+  }
+}

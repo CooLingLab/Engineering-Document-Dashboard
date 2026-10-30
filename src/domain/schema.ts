@@ -17,7 +17,7 @@ function safeRecord<T>(item: z.ZodType<T>) {
   });
 }
 
-const manualStatus = z.enum(['not-started', 'in-progress', 'done', 'deferred']);
+const manualStatus = z.enum(['not-started', 'in-progress', 'done', 'deferred', 'skipped']);
 const documentChoice = z.enum(['needed', 'not-needed', 'later']);
 const repository = z.strictObject({
   id: z.number().int().positive(), owner: z.string(), name: z.string(),

@@ -53,7 +53,7 @@ describe('project configuration', () => {
 
   it('provides actionable guidance and a reusable prompt for each built-in stage', () => {
     expect(templates.map((template) => template.id)).toEqual([
-      'general-app', 'mvp', 'iterative',
+      'general-app', 'mvp', 'iterative', 'devflow-v3',
     ]);
     for (const template of templates) {
       for (const node of template.graph.nodes) {

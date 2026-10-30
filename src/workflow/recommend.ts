@@ -12,7 +12,7 @@ export function recommendNext(config: ProjectConfig, snapshot: DocumentSnapshot,
     const analysis = Object.hasOwn(state.analyses, node.id) ? state.analyses[node.id] : undefined;
     return [node.id, deriveNodeView(config, snapshot, node.id, aiEnabled && analysis?.adviceBasisFingerprint === basis)] as const;
   }));
-  const pending = nodes.filter((node) => !['done', 'deferred'].includes(views.get(node.id)!.status));
+  const pending = nodes.filter((node) => !['done', 'deferred', 'skipped'].includes(views.get(node.id)!.status));
   if (!pending.length) return { nodeId: null, action: 'all-done', source: nodes.some((node) => views.get(node.id)?.source === 'ai') ? 'ai' : 'manual', reason: '当前没有建议推进的环节。' };
   const progressing = pending.find((node) => views.get(node.id)?.source === 'manual' && views.get(node.id)?.status === 'in-progress');
   const ready = pending.find((node) => config.graph.edges.filter((edge) => edge.target === node.id).every((edge) => {

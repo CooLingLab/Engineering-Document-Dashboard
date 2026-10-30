@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('adding a stage keeps it inside the visible flow canvas', async ({ page }) => {
+test('the canonical route is locked while stage document choices remain editable', async ({ page }) => {
   await page.route('https://api.github.com/**', async (route) => {
     const url = new URL(route.request().url());
     let body: unknown;
@@ -16,33 +16,14 @@ test('adding a stage keeps it inside the visible flow canvas', async ({ page }) 
   await page.getByLabel('GitHub 仓库地址').fill('fixture/demo');
   await page.getByRole('button', { name: /连接仓库/ }).click();
   await expect(page.getByText('fixture/demo', { exact: true })).toBeVisible();
-  const requirements = page.locator('.react-flow__node').filter({ hasText: '需求' });
-  await expect(requirements).toContainText('缺 1 份');
-  await requirements.click();
-  await page.getByLabel('文档取舍：02-requirements.md').selectOption('not-needed');
-  await expect(requirements).not.toContainText('缺 1 份');
-  await page.getByRole('button', { name: '编辑流程' }).click();
-  await page.getByLabel('新环节名称').fill('复盘');
-  await page.getByRole('button', { name: '添加环节' }).click();
-  const canvas = page.locator('.flow-canvas');
-  const node = page.locator('.react-flow__node').filter({ hasText: '复盘' });
-  await expect(node).toHaveCount(1);
-  await canvas.scrollIntoViewIfNeeded();
-  await expect.poll(async () => {
-    const canvasBox = await canvas.boundingBox();
-    const nodeBox = await node.boundingBox();
-    if (!canvasBox || !nodeBox) return false;
-    return nodeBox.x >= canvasBox.x && nodeBox.x + nodeBox.width <= canvasBox.x + canvasBox.width;
-  }, { timeout: 3000 }).toBe(true);
-  await page.getByLabel('起点').selectOption({ label: '需求' });
-  await page.getByLabel('终点').selectOption({ label: '复盘' });
-  await page.getByRole('button', { name: '添加连线' }).click();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(6);
-  await page.getByLabel('选择流程范式').selectOption('blank');
-  await page.getByRole('button', { name: '应用此流程' }).click();
-  await expect(page.locator('.react-flow__node')).toHaveCount(0);
-  await page.getByRole('button', { name: '准备恢复' }).first().click();
-  await page.getByRole('button', { name: '确认恢复' }).click();
-  await expect(page.locator('.react-flow__node')).toHaveCount(7);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(6);
+
+  const stages = page.getByRole('navigation', { name: '八阶段开发流程' }).getByRole('button');
+  await expect(stages).toHaveCount(8);
+  await expect(page.getByRole('button', { name: '编辑流程' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Strategic DDD/ }).click();
+  await page.getByLabel('文档取舍：02-domain.md').selectOption('not-needed');
+  await expect(page.getByLabel('文档取舍：02-domain.md')).toHaveValue('not-needed');
+  await page.getByLabel('手动状态').selectOption('skipped');
+  await expect(page.getByText(/不会被视为已完成/)).toBeVisible();
+  await expect(stages).toHaveCount(8);
 });

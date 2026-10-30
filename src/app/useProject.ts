@@ -4,7 +4,7 @@ import { createProject, getBranchState, type DocumentSnapshot, type ProjectConfi
 import type { AnalysisRecord } from '../domain/analysis';
 import { GitHubError, type GitHubReader } from '../github/client';
 import { parseRepositoryInput } from '../github/repository';
-import { templates } from '../templates/catalog';
+import { devflowTemplate } from '../templates/catalog';
 import { initialSession, projectReducer, type ProjectAction } from './projectReducer';
 
 function emptySnapshot(repository: Repository, root: string): DocumentSnapshot {
@@ -58,7 +58,7 @@ export function useProject(reader: GitHubReader) {
       if (priorBranch && !branches.includes(priorBranch)) throw new GitHubError('not-found-or-no-access', '原分支不存在或无法读取，已保留当前草稿。');
       branch = priorBranch ?? (branches.length ? repository.defaultBranch || branches[0] : null);
       dispatch({ type: 'scope', generation: pending.generation, repositoryId, branch });
-      const config = preserveDraft && originalConfig ? { ...originalConfig, repository } : createProject(repository, templates[0]);
+      const config = preserveDraft && originalConfig ? { ...originalConfig, repository } : createProject(repository, devflowTemplate);
       const snapshot = branch ? await loadDocumentSnapshot(reader, repository, branch, config.documentRules.root, pending.controller.signal)
         : emptySnapshot(repository, config.documentRules.root);
       if (pending.generation === generation.current && current.current.config !== originalConfig) {

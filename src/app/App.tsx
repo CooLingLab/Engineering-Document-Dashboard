@@ -3,18 +3,17 @@ import { ConnectProject } from '../components/ConnectProject';
 import { ModelPanel } from '../components/ModelPanel';
 import { StageDetails } from '../components/StageDetails';
 import { SyncPanel } from '../components/SyncPanel';
-import { TemplatePicker } from '../components/TemplatePicker';
-import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { WorkflowEditor } from '../components/WorkflowEditor';
-import { MobileWorkflowEditor } from '../components/MobileWorkflowEditor';
 import { normalizeDocumentRoot } from '../documents/index';
 import { indexDocuments } from '../documents/match';
-import { getBranchState, type NodeView, type ProjectConfig } from '../domain/project';
+import type { NodeView, ProjectConfig } from '../domain/project';
 import { GitHubReader } from '../github/client';
 import { MemoryCredentials } from '../github/credentials';
 import { RefreshScheduler, type RefreshState } from '../github/refresh';
 import { useProject } from './useProject';
-import { templates } from '../templates/catalog';
+import { devflowTemplate, DEVFLOW_TEMPLATE_ID } from '../templates/catalog';
+import { switchTemplate } from '../workflow/backup';
+import { FixedStageNavigator } from '../components/FixedStageNavigator';
+import { BackupManager } from '../components/BackupManager';
 import { deriveNodeView } from '../workflow/status';
 import { recommendNext } from '../workflow/recommend';
 import './app.css';
@@ -32,8 +31,6 @@ export default function App() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [showConnect, setShowConnect] = useState(true);
   const [connectionCount, setConnectionCount] = useState(0);
-  const [editing, setEditing] = useState(false);
-  const [history, setHistory] = useState<ProjectConfig[]>([]);
   const [documentRoot, setDocumentRoot] = useState('docs/development');
   const [refreshState, setRefreshState] = useState<RefreshState | null>(null);
   const scheduler = useRef<RefreshScheduler | null>(null);
@@ -70,18 +67,24 @@ export default function App() {
     const previousToken = credentials.get('target');
     credentials.set('target', token || undefined);
     if (await session.connect(input)) {
-      setShowConnect(false); setEditing(false); setHistory([]); setDocumentRoot(session.getState().config?.documentRules.root ?? templates[0].documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
+      setShowConnect(false); setDocumentRoot(session.getState().config?.documentRules.root ?? devflowTemplate.documentRules.root); setAiEnabled(false); setConnectionCount((value) => value + 1);
     } else credentials.set('target', previousToken);
   }
 
-  async function applyConfigChange(next: ProjectConfig, mode: 'push' | 'undo' = 'push') {
+  async function applyConfigChange(next: ProjectConfig) {
     if (!config) return;
-    const previous = config;
-    const previousHistory = history;
-    setHistory((items) => mode === 'undo' ? items.slice(0, -1) : [...items.slice(-19), structuredClone(previous)]);
-    if (await session.applyConfig(next)) {
-      setDocumentRoot(next.documentRules.root);
-    } else setHistory(previousHistory);
+    if (await session.applyConfig(next)) setDocumentRoot(next.documentRules.root);
+  }
+
+  function adoptStandardWorkflow() {
+    if (!config || busy) return;
+    if (!window.confirm('将当前流程替换为固定八阶段 V3，旧流程与各分支状态会存入备份。此操作不会修改目标仓库。确定继续吗？')) return;
+    try {
+      const next = switchTemplate(config, devflowTemplate, new Date());
+      void applyConfigChange(next).then(() => setSelectedNodeId(next.graph.nodes[0]?.id ?? null));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '切换标准流程失败。');
+    }
   }
 
   function changeDirectory() {
@@ -92,11 +95,6 @@ export default function App() {
       setError(null);
       void applyConfigChange(next);
     } catch (changeError) { setError(changeError instanceof Error ? changeError.message : '文档目录无效。'); }
-  }
-
-  function undo() {
-    const previous = history.at(-1);
-    if (previous) void applyConfigChange(previous, 'undo');
   }
 
   const documentIndex = useMemo(() => config && snapshot ? indexDocuments(config, snapshot) : null, [config, snapshot]);
@@ -112,7 +110,7 @@ export default function App() {
     </aside>
     <main id="home" className="main-content">
       <header className="topbar"><span>工作空间 <span className="muted">/ 项目概览</span></span><button type="button" className="beginner-pill" onClick={() => setBeginnerMode(!beginnerMode)} aria-pressed={beginnerMode}>✦ 新手模式{beginnerMode ? '已开启' : '已关闭'}</button></header>
-      <div className={`page-content${config ? ' is-connected' : ''}${editing ? ' mobile-editing' : ''}`}>
+      <div className={`page-content${config ? ' is-connected' : ''}`}>
         <div className="eyebrow"><span className="eyebrow-dot" /> 从这里开始</div>
         <h1>让每一步开发，都<span>清晰可见。</span></h1>
         <p className="intro">连接你的 GitHub 项目，把散落的文档和开发进度放到一张路线图上。</p>
@@ -122,13 +120,19 @@ export default function App() {
         {!showConnect && error && <p className="connection-error" role="alert">{error}</p>}
         {config && snapshot && <details className="directory-settings"><summary>文档目录：{config.documentRules.root} · 修改文档目录</summary><form onSubmit={(event) => { event.preventDefault(); changeDirectory(); }}><label>文档目录<input value={documentRoot} onChange={(event) => setDocumentRoot(event.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>应用目录</button></form></details>}
         {config && <SyncPanel key={`sync-${config.repository.id}-${connectionCount}`} config={config} dirty={dirty} credentials={credentials} fetcher={fetch}
-          onLoaded={async (loaded) => { const applied = await session.applyLoadedConfig(loaded); if (applied) { setDocumentRoot(loaded.documentRules.root); setHistory([]); } return applied; }}
+          onLoaded={async (loaded) => { const applied = await session.applyLoadedConfig(loaded); if (applied) { setDocumentRoot(loaded.documentRules.root); } return applied; }}
           onSaved={session.markSaved} />}
         {config && snapshot && <ModelPanel key={`model-${config.repository.id}-${connectionCount}`} config={config} snapshot={snapshot} selectedNodeId={selectedNodeId}
           credentials={credentials} fetcher={fetch} onEnabledChange={setAiEnabled} onCommit={session.commitAnalysis} />}
         {snapshot?.issues.map((issue, index) => <p key={`${issue.path}-${index}`} className="scan-issue" role="status">{issue.message}</p>)}
-        <section className="route-intro" aria-labelledby="route-title"><div><div className="section-kicker">YOUR DEVELOPMENT JOURNEY</div><h2 id="route-title">你的开发路线</h2><p>不必一次完成所有事情。先看全貌，再从眼前的一步开始。</p></div>{config ? <button type="button" className="secondary-button" onClick={() => setEditing(!editing)}>{editing ? '完成编辑' : '编辑流程'}</button> : <span className="recommended">推荐路线</span>}</section>
-        {config && snapshot && documentIndex ? <><div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div><div className="desktop-workflow-canvas"><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} onGraphChange={editing && !busy ? (graph) => void applyConfigChange({ ...config, graph }) : undefined} documentIndex={documentIndex} documentChoices={getBranchState(config, snapshot.ref?.name ?? '').documentChoices} /></div>{editing && <MobileWorkflowEditor config={config} selectedNodeId={selectedNodeId} nodeViews={nodeViews} documentIndex={documentIndex} documentChoices={getBranchState(config, snapshot.ref?.name ?? '').documentChoices} disabled={busy} dirty={dirty} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} onUndo={undo} canUndo={history.length > 0} />}{editing && <fieldset className="editing-container" disabled={busy}><WorkflowEditor config={config} selectedNodeId={selectedNodeId} documentIndex={documentIndex} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} onUndo={undo} canUndo={history.length > 0} /><TemplatePicker config={config} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} /></fieldset>}{selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)} />}</> : <div className="route-preview" aria-label="通用应用开发流程">{templates[0].graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
+        <section className="route-intro" aria-labelledby="route-title"><div><div className="section-kicker">STANDARD AI DEVELOPMENT LIFECYCLE · V3</div><h2 id="route-title">固定八阶段开发路线</h2><p>主干固定，按阶段管理文档、状态和验收；不适用的阶段可手动跳过。</p></div><span className="recommended">标准流程</span></section>
+        {config && config.template?.id !== DEVFLOW_TEMPLATE_ID && <div className="standard-migration" role="status"><div><strong>当前仓库仍在使用旧版自定义流程</strong><p>可以切换到标准八阶段。旧流程与分支记录会自动备份，迁移后不会自动覆盖 GitHub 配置。</p></div><button type="button" className="secondary-button" disabled={busy || config.backups.length >= 10} onClick={adoptStandardWorkflow}>切换到八阶段 V3</button>{config.backups.length >= 10 && <small>备份已满，请先处理历史备份。</small>}</div>}
+        {config && <BackupManager config={config} disabled={busy} onChange={(next) => void applyConfigChange(next)} onSelectNode={setSelectedNodeId} />}
+        {config && snapshot && documentIndex ? <>
+          <div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div>
+          <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
+          {selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)} />}
+        </> : <div className="route-preview" aria-label="AI 开发八阶段">{devflowTemplate.graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
         <div className="footer-note">✳ 你的文档留在原来的仓库中，我们只读取它们。</div>
       </div>
     </main>

@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1",
+  "artifacts": [
+    {
+      "path": ".devflow/workflow.json",
+      "kind": "workflow",
+      "feature": "devflow-foundation"
+    },
+    {
+      "path": ".devflow/state.json",
+      "kind": "state",
+      "feature": "devflow-foundation"
+    },
+    {
+      "path": ".devflow/README.md",
+      "kind": "documentation",
+      "feature": "devflow-foundation"
+    }
+  ]
+}

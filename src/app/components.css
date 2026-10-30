@@ -130,3 +130,51 @@
   .mobile-unsaved-notice { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 11px; background: #fff7e9; color: #835e2b; font-size: 12px; line-height: 1.6; }
   .mobile-unsaved-notice button { flex: none; min-height: 44px; border: 1px solid #e7c88f; background: white; border-radius: 9px; color: #81561d; padding: 8px 12px; }
 }
+
+
+/* DevFlow V3: canonical topology is read-only; on phones choose stages by tapping. */
+.fixed-stage-nav { display: none; }
+.standard-migration { display: flex; align-items: center; gap: 18px; justify-content: space-between; flex-wrap: wrap; margin-top: 18px; border: 1px solid #dfe5f7; background: #fff; border-radius: 12px; padding: 16px; font-size: 12px; color: #435471; }
+.standard-migration p { margin: 6px 0 0; line-height: 1.6; color: #7b88a0; }
+.standard-migration small { color: #b16e50; }
+.stage-skip-note { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: #f7f8fb; color: #73819b; font-size: 12px; line-height: 1.6; }
+.route-preview:has(.route-step:nth-child(8)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .route-preview:has(.route-step:nth-child(8)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .desktop-workflow-canvas { display: none; }
+  .fixed-stage-nav { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 16px; }
+  .fixed-stage-item { width: 100%; display: flex; gap: 11px; align-items: center; text-align: left; min-height: 54px; border: 1px solid #e3e8f2; border-radius: 11px; background: white; padding: 12px; color: #34435c; cursor: pointer; }
+  .fixed-stage-item[aria-current="step"] { border-color: #7486e8; box-shadow: 0 0 0 2px #7486e820; background: #f8f9ff; }
+  .fixed-stage-number { color: #7180da; font-size: 12px; font-weight: 700; }
+  .fixed-stage-title { flex: 1; min-width: 0; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+  .fixed-stage-status { color: #8c98ac; font-size: 11px; white-space: nowrap; }
+  .standard-migration button { width: 100%; min-height: 44px; }
+}
+
+
+/* Four-by-two stage overview on desktop; tap-friendly cards on phones. */
+.fixed-stage-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.fixed-stage-item { min-width: 0; min-height: 100px; border: 1px solid #e3e8f2; border-radius: 12px; background: #fff; padding: 14px; color: #34435c; cursor: pointer; display: flex; gap: 8px; flex-wrap: wrap; align-content: space-between; align-items: center; text-align: left; }
+.fixed-stage-item[aria-current="step"] { border-color: #7486e8; box-shadow: 0 0 0 2px #7486e820; background: #f8f9ff; }
+.fixed-stage-number { font-size: 12px; font-weight: 750; color: #7180da; }
+.fixed-stage-title { width: 100%; overflow-wrap: anywhere; font-size: 13px; font-weight: 650; }
+.fixed-stage-status { font-size: 11px; color: #8c98ac; }
+@media (max-width: 900px) and (min-width: 701px) { .fixed-stage-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .fixed-stage-nav { grid-template-columns: 1fr; }
+  .fixed-stage-item { min-height: 60px; align-content: center; flex-wrap: nowrap; }
+  .fixed-stage-title { width: auto; flex: 1; }
+}
+
+.document-item { flex-wrap: wrap; }
+.document-item select { max-width: 100%; min-width: 96px; }
+@media (max-width: 700px) { .document-item { align-items: flex-start; } .document-item select { flex: 1; min-width: 120px; } }
+
+.backup-manager { margin-top: 14px; padding: 14px; border: 1px solid #e3e8f2; border-radius: 12px; background: #fff; color: #7a88a0; font-size: 12px; }
+.backup-manager summary { cursor: pointer; font-weight: 650; color: #586a8a; }
+.backup-manager p { font-size: 11px; line-height: 1.6; }
+.backup-manager-item { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 10px 0; border-top: 1px solid #edf0f5; }
+.backup-manager-item > span { flex: 1; min-width: 170px; }
+@media (max-width: 700px) { .backup-manager-item button { min-height: 40px; } }

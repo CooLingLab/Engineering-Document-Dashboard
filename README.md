@@ -1,11 +1,13 @@
 # 开发路线 · Development Dashboard
 
-把一个 GitHub 项目的 Markdown 开发文档放在可视化路线中，帮助开发者了解当前有哪些文档、每个环节要做什么，以及接下来可以从哪里开始。目标项目始终只读；工具不会生成或修改项目文档。
+以 **DevFlow V3 标准八阶段**组织 GitHub 项目中的 Markdown 开发文档，让开发者和 AI 都有固定的阶段含义、明确的下一步与可追溯的状态。目标项目始终只读；工具不会生成或修改项目文档。
 
 ## 可以做什么
 
 - 连接 GitHub 仓库，选择分支，阅读指定目录下的 Markdown；默认目录为 `docs/development`，可以在页面中调整。
-- 使用通用应用、MVP 或迭代开发范式，也可以从空白画布开始；增删、拖拽环节并连接路线，切换范式前会保留可恢复的备份。
+- 新项目默认使用固定八阶段 V3，阶段顺序不可在网页里随意拖拽、增删或修改连线；手机上直接点选阶段卡片。
+- 旧的自定义路线不会自动被覆盖；连接后可以手动迁移到标准八阶段，原有路线与分支状态会先备份。
+- 保留阶段内的状态、关联文档取舍与 Prompt，允许为当前分支将不适用的阶段标记为「跳过」。
 - 手动标记环节状态、设置文档是否需要、查看下一步建议；状态按分支保存，手动标记优先于文档分析。
 - 对缺失的文档复制通用 prompt，到自己选择的工具中使用。网页本身不生成文档。
 - 可选地连接在线 OpenAI 兼容模型或本机 Ollama：先预览文档范围，再手动确认分析；结果提供证据位置及过期提示。
@@ -24,16 +26,20 @@ npm run dev
 
 打开终端输出的本地地址。输入 `owner/repository` 或 GitHub 仓库地址，连接后可切换分支、点选环节并阅读文档。新仓库没有提交时仍可编辑路线和复制 prompt；之后点击“刷新文档”可发现新分支。
 
-通用应用范式默认查找以下文件，均位于 `docs/development/`。文件缺失只提示补充，不代表开发已完成或未完成；可以在“编辑流程”中调整名称和关联。
+V3 标准流程默认查找以下文件，均位于 `docs/development/`。文件缺失只提示补充，不等于开发未完成；可以在阶段详情中标记文档是否需要。
 
 ```text
-01-vision.md           想法与目标
-02-requirements.md     需求
-03-design.md           设计
-04-implementation.md   开发
-05-testing.md          测试
-06-delivery.md         交付
+01-idea.md                Idea → Brainstorm
+02-domain.md              Strategic DDD
+03-concept-validation.md  Concept Prototype → Validation
+04-roadmap.md             Roadmap
+05-ui-prototype.md        UI Prototype
+06-spec-plan.md           Spec → Architecture / ADR → Plan
+07-implementation.md      Harness + Agent Loop
+08-release.md             Human Acceptance → Release
 ```
+
+`.devflow/workflow.json` 定义拟议的机器可读规范，`.devflow/state.json` 用来示范功能级状态结构。**目前 Dashboard 尚未自动从目标仓库读取这两份 JSON 作为执行状态**，实际网页状态仍按分支记录在独立的配置仓库。阶段「跳过」是人工标注，不表示完成验证或获得人工批准。
 
 ## 仓库权限与跨设备同步
 

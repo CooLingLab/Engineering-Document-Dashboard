@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.1",
+  "project": "Engineering-Document-Dashboard",
+  "active_release": "MVP",
+  "features": [
+    {
+      "id": "devflow-foundation",
+      "name": "Machine-readable development workflow",
+      "phase": "build",
+      "status": "in_progress",
+      "artifacts": [
+        ".devflow/workflow.json",
+        "src/templates/catalog.ts",
+        "src/components/FixedStageNavigator.tsx",
+        "src/app/App.tsx",
+        "tests/devflow-lifecycle.test.ts"
+      ],
+      "gate": {
+        "status": "pending",
+        "approved_by": null
+      },
+      "notes": "Fixed eight-stage UI and manual skip are implemented on feature branch; validation and human acceptance remain pending. State file is not yet loaded by the UI."
+    }
+  ]
+}
