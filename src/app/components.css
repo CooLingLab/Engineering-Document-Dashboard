@@ -125,3 +125,8 @@
   .mobile-sheet-section li button { flex: none; }
   .mobile-danger-section button { color: #b74750 !important; }
 }
+
+@media (max-width: 700px) {
+  .mobile-unsaved-notice { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 11px; background: #fff7e9; color: #835e2b; font-size: 12px; line-height: 1.6; }
+  .mobile-unsaved-notice button { flex: none; min-height: 44px; border: 1px solid #e7c88f; background: white; border-radius: 9px; color: #81561d; padding: 8px 12px; }
+}
