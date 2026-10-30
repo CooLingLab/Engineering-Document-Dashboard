@@ -44,6 +44,17 @@ describe('first project connection', () => {
     expect(within(details).queryByText(/减少开发中反复猜测/)).not.toBeInTheDocument();
     expect(within(details).getByText('用户希望记录一本书。')).toBeInTheDocument();
     expect(within(details).getByRole('button', { name: '复制 prompt' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '编辑流程' }));
+    fireEvent.change(screen.getByLabelText('新环节名称'), { target: { value: '复盘' } });
+    fireEvent.change(screen.getByLabelText('环节说明'), { target: { value: '总结本轮经验' } });
+    fireEvent.click(screen.getByRole('button', { name: '添加环节' }));
+    expect(screen.getByRole('button', { name: '查看复盘' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '撤销上一步' }));
+    expect(screen.queryByRole('button', { name: '查看复盘' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/修改文档目录/));
+    fireEvent.change(screen.getByLabelText('文档目录'), { target: { value: 'docs/other' } });
+    fireEvent.click(screen.getByRole('button', { name: '应用目录' }));
+    expect(await screen.findByText(/未找到文档目录/)).toBeInTheDocument();
   }, 10_000);
 
   it('distinguishes an inaccessible repository from missing documents', async () => {
