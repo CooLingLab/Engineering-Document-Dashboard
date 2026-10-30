@@ -15,11 +15,12 @@ type Props = {
   onUndo: () => void;
   canUndo: boolean;
   disabled?: boolean;
+  dirty?: boolean;
 };
 
 export function MobileWorkflowEditor({
   config, selectedNodeId, nodeViews, documentIndex, documentChoices,
-  onChange, onSelectNode, onUndo, canUndo, disabled,
+  onChange, onSelectNode, onUndo, canUndo, disabled, dirty,
 }: Props) {
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [sheetId, setSheetId] = useState<string | null>(null);
@@ -204,6 +205,13 @@ export function MobileWorkflowEditor({
       </form>}
       <button type="button" className="mobile-add-main" disabled={disabled} onClick={() => { setAddingAfter(null); setNewTitle(''); setError(''); }}>＋ 添加新环节</button>
     </>}
+    {dirty && <div className="mobile-unsaved-notice" role="status">
+      <span>修改仅在当前页面，离开前请同步到 GitHub。</span>
+      <button type="button" onClick={() => {
+        const panel = document.getElementById('workflow-sync-panel') as HTMLDetailsElement | null;
+        if (panel) { panel.open = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }}>前往保存</button>
+    </div>}
     {!node && error && <p className="connection-error" role="alert">{error}</p>}
     {node && <div className="mobile-sheet-layer">
       <button type="button" className="mobile-sheet-backdrop" aria-label="关闭编辑面板" onClick={() => setSheetId(null)} />
