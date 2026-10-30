@@ -3,7 +3,6 @@ import { ConnectProject } from '../components/ConnectProject';
 import { ModelPanel } from '../components/ModelPanel';
 import { StageDetails } from '../components/StageDetails';
 import { SyncPanel } from '../components/SyncPanel';
-import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { normalizeDocumentRoot } from '../documents/index';
 import { indexDocuments } from '../documents/match';
 import { getBranchState, type NodeView, type ProjectConfig } from '../domain/project';
@@ -129,7 +128,6 @@ export default function App() {
         {config && config.template?.id !== DEVFLOW_TEMPLATE_ID && <div className="standard-migration" role="status"><div><strong>当前仓库仍在使用旧版自定义流程</strong><p>可以切换到标准八阶段。旧流程与分支记录会自动备份，迁移后不会自动覆盖 GitHub 配置。</p></div><button type="button" className="secondary-button" disabled={busy || config.backups.length >= 10} onClick={adoptStandardWorkflow}>切换到八阶段 V3</button>{config.backups.length >= 10 && <small>备份已满，请先处理历史备份。</small>}</div>}
         {config && snapshot && documentIndex ? <>
           <div className="next-step"><span>✦</span><div><strong>建议下一步</strong><p>{recommendation?.reason}</p>{recommendation?.nodeId && <button type="button" className="suggestion-link" onClick={() => setSelectedNodeId(recommendation.nodeId)}>查看建议环节 →</button>}</div></div>
-          <div className="desktop-workflow-canvas"><WorkflowCanvas graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} documentIndex={documentIndex} documentChoices={getBranchState(config, snapshot.ref?.name ?? '').documentChoices} /></div>
           <FixedStageNavigator graph={config.graph} nodeViews={nodeViews} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
           {selectedNodeId && <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex} beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)} />}
         </> : <div className="route-preview" aria-label="AI 开发八阶段">{devflowTemplate.graph.nodes.map((node, index) => <div className="route-step" key={node.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><strong>{node.title}</strong><small>等待连接</small></div>)}</div>}
