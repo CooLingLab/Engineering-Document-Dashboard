@@ -52,10 +52,10 @@ describe('project session', () => {
     refs.set('feature', feature);
     let pending!: Promise<void>;
     act(() => { pending = result.current.selectBranch('feature'); });
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'domain', 'done')); });
     await act(async () => { feature.resolve({ name: 'feature', commitSha: 'new' }); await pending; });
     const config = result.current.state.config!;
-    expect(getBranchState(config, 'main').manualStatuses.requirements).toBe('done');
+    expect(getBranchState(config, 'main').manualStatuses.domain).toBe('done');
     expect(getBranchState(config, 'feature').manualStatuses).toEqual({});
     expect(getBranchState(config, '__proto__').manualStatuses).toEqual({});
     expect(result.current.state.dirty).toBe(true);
@@ -65,12 +65,12 @@ describe('project session', () => {
     const { reader } = fakeReader();
     const { result } = renderHook(() => useProject(reader));
     await act(async () => result.current.connect('example/first'));
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'domain', 'done')); });
     vi.mocked(reader.resolveRef).mockRejectedValueOnce(new GitHubError('not-found-or-no-access', '分支无法读取'));
     await act(async () => result.current.selectBranch('feature'));
     expect(result.current.state.selectedBranch).toBe('main');
     expect(result.current.state.error).toBe('分支无法读取');
-    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.domain).toBe('done');
   });
 
   it('does not let an old repository connection overwrite a newer one', async () => {
@@ -102,7 +102,7 @@ describe('project session', () => {
     const { result } = renderHook(() => useProject(reader));
     await act(async () => { await result.current.connect('example/first'); });
     const earlier = result.current.state.config!;
-    await act(async () => { await result.current.applyConfig(setManualStatus(earlier, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(earlier, 'main', 'domain', 'done')); });
     act(() => result.current.markSaved(earlier));
     expect(result.current.state.dirty).toBe(true);
   });
@@ -128,11 +128,11 @@ describe('project session', () => {
     const { reader } = fakeReader();
     const { result } = renderHook(() => useProject(reader));
     await act(async () => { await result.current.connect('example/first'); });
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, '__proto__', 'requirements', 'done')); });
-    act(() => result.current.commitAnalysis(1, makeAnalysis({ branch: '__proto__', decision: 'in-progress' })));
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, '__proto__', 'domain', 'done')); });
+    act(() => result.current.commitAnalysis(1, makeAnalysis({ nodeId: 'domain', branch: '__proto__', decision: 'in-progress' })));
     const branch = getBranchState(result.current.state.config!, '__proto__');
-    expect(branch.manualStatuses.requirements).toBe('done');
-    expect(branch.analyses.requirements.decision).toBe('in-progress');
+    expect(branch.manualStatuses.domain).toBe('done');
+    expect(branch.analyses.domain.decision).toBe('in-progress');
     expect(result.current.state.selectedBranch).toBe('main');
   });
 
@@ -158,10 +158,10 @@ describe('project session', () => {
     vi.mocked(reader.getRepository).mockImplementationOnce(() => delayed.promise);
     let pending!: Promise<boolean>;
     act(() => { pending = result.current.connect('example/second'); });
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'domain', 'done')); });
     await act(async () => { delayed.resolve({ id: 2, owner: 'example', name: 'second', defaultBranch: 'main' }); await pending; });
     expect(result.current.state.config?.repository.name).toBe('first');
-    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.domain).toBe('done');
     expect(result.current.state.error).toMatch(/保留.*草稿/);
   });
   it('keeps the live GitHub repository address when loading a configuration saved before a rename', async () => {
@@ -177,11 +177,11 @@ describe('project session', () => {
     const { reader } = fakeReader();
     const { result } = renderHook(() => useProject(reader));
     await act(async () => { await result.current.connect('example/first'); });
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'domain', 'done')); });
     vi.mocked(reader.getRepository).mockResolvedValueOnce({ id: 1, owner: 'example', name: 'renamed', defaultBranch: 'main' });
     await act(async () => { await result.current.connect('example/renamed'); });
     expect(result.current.state.config?.repository.name).toBe('renamed');
-    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.domain).toBe('done');
     expect(result.current.state.dirty).toBe(true);
   });
   it('clears previously read document contents when repository access is revoked', async () => {
@@ -202,12 +202,12 @@ describe('project session', () => {
     vi.mocked(reader.listBranches).mockResolvedValueOnce(['main']).mockResolvedValueOnce(['develop']);
     const { result } = renderHook(() => useProject(reader));
     await act(async () => { await result.current.connect('example/first'); });
-    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'requirements', 'done')); });
+    await act(async () => { await result.current.applyConfig(setManualStatus(result.current.state.config!, 'main', 'domain', 'done')); });
     await act(async () => { await result.current.refresh(); });
     expect(result.current.state.selectedBranch).toBe('main');
     expect(result.current.state.branches).toContain('develop');
     await act(async () => { await result.current.selectBranch('develop'); });
     expect(result.current.state.selectedBranch).toBe('develop');
-    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.requirements).toBe('done');
+    expect(getBranchState(result.current.state.config!, 'main').manualStatuses.domain).toBe('done');
   });
 });
