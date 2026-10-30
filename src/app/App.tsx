@@ -40,6 +40,7 @@ export default function App() {
   const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<RefreshState | null>(null);
   const scheduler = useRef<RefreshScheduler | null>(null);
+  const readerPanelRef = useRef<HTMLDivElement | null>(null);
   const refreshCallback = useRef(session.refresh);
   refreshCallback.current = session.refresh;
   const busyRef = useRef(busy);
@@ -126,6 +127,10 @@ export default function App() {
   function chooseDocument(path: string) {
     if (!snapshot?.documents.some((file) => file.path === path)) return;
     setSelectedDocumentPath(path);
+    // On phones, jump to the reader after choosing a file deep in the folder tree.
+    if (window.matchMedia?.('(max-width: 700px)').matches) {
+      window.requestAnimationFrame?.(() => readerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
     const stages = documentLinks?.byPath.get(path) ?? [];
     if (stages.length && (!selectedNodeId || !stages.includes(selectedNodeId))) setSelectedNodeId(stages[0]);
   }
@@ -173,8 +178,8 @@ export default function App() {
                   links={documentLinks} selectedStageId={selectedNodeId} selectedPath={activeDocumentPath} onSelectDocument={chooseDocument} />
               </div>
               <div className="workspace-reader-column">
-                <DocumentPreview snapshot={snapshot} graph={config.graph} links={documentLinks} selectedStageId={selectedNodeId}
-                  selectedPath={activeDocumentPath} onSelectDocument={chooseDocument} onSelectStage={chooseStage} />
+                <div ref={readerPanelRef}><DocumentPreview snapshot={snapshot} graph={config.graph} links={documentLinks} selectedStageId={selectedNodeId}
+                  selectedPath={activeDocumentPath} onSelectDocument={chooseDocument} onSelectStage={chooseStage} /></div>
                 {selectedNodeId && <div className="workspace-stage-details">
                   <StageDetails config={config} snapshot={snapshot} nodeId={selectedNodeId} documentIndex={documentIndex}
                     beginnerMode={beginnerMode} aiEnabled={aiEnabled} onChangeConfig={(next) => void applyConfigChange(next)}
