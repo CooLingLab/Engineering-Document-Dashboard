@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DocumentTree } from '../../src/components/DocumentTree';
+import { StageDetails } from '../../src/components/StageDetails';
 import { DocumentPreview } from '../../src/components/DocumentPreview';
 import { indexDocuments } from '../../src/documents/match';
 import { buildDocumentStageLinks, buildDocumentTree } from '../../src/documents/tree';
@@ -64,4 +65,28 @@ describe('document explorer', () => {
     expect(screen.getByText(/未关联 · 可在阶段详情中关联/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Unrelated notes' })).toBeInTheDocument();
   });
+  it('can attach and remove extra Markdown files from a fixed stage', () => {
+    const onChange = vi.fn();
+    const onSelectDocument = vi.fn();
+    const rendered = render(<StageDetails config={config} snapshot={snapshot} nodeId="spec"
+      documentIndex={index} beginnerMode={false} showEmbeddedReader={false}
+      onChangeConfig={onChange} onSelectDocument={onSelectDocument} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '关联更多已有文档' }), { target: { value: notesPath } });
+    fireEvent.click(screen.getByRole('button', { name: '关联到本阶段' }));
+    const updated = onChange.mock.calls[0][0];
+    const additional = updated.documentRules.expected.find((item: { id: string }) => item.id.startsWith('extra-spec-'));
+    expect(additional).toBeDefined();
+    expect(updated.documentRules.bindings[additional.id]).toBe(notesPath);
+    expect(buildDocumentStageLinks(indexDocuments(updated, snapshot), updated.graph).byPath.get(notesPath))
+      .toContain('spec');
+
+    rendered.rerender(<StageDetails config={updated} snapshot={snapshot} nodeId="spec"
+      documentIndex={indexDocuments(updated, snapshot)} beginnerMode={false} showEmbeddedReader={false}
+      onChangeConfig={onChange} onSelectDocument={onSelectDocument} />);
+    fireEvent.click(screen.getByRole('button', { name: `移除文档关联：${notesPath}` }));
+    const restored = onChange.mock.calls[1][0];
+    expect(restored.documentRules.expected.some((item: { id: string }) => item.id === additional.id)).toBe(false);
+    expect(restored.documentRules.bindings[additional.id]).toBeUndefined();
+  });
+
 });
