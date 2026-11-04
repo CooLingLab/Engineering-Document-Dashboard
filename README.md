@@ -77,3 +77,7 @@ npm run test:e2e
 ```
 
 `check:dist` 只检查构建目录中的合成测试隐私标记和源码映射，不是通用的秘密扫描器。浏览器测试使用合成 GitHub 和模型响应；真实服务、私有权限和浏览器环境的实际验证范围见 [验证记录](docs/verification.md)。
+
+## CI 与分支保护
+
+`main` 只接受通过 PR 合并的变更，并要求 `检查` 工作流中的 `check` 成功；不强制人工 review。`检查` 在 PR 更新和 main push 时运行 typecheck、单元测试、build、check:dist 与 E2E，同一 PR 的新提交会取消旧运行。`发布 GitHub Pages` 仍只手动触发。
