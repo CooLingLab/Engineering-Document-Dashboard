@@ -52,7 +52,7 @@ test('an initially empty repository can discover its first branch without losing
   await page.getByRole('button', { name: /连接仓库/ }).click();
   await expect(page.getByLabel('当前分支')).toHaveValue('');
   await page.getByText(/修改文档目录/).click();
-  await page.getByLabel('文档目录').fill('docs/extra');
+  await page.getByRole('textbox', { name: '文档目录', exact: true }).fill('docs/extra');
   await page.getByRole('button', { name: '应用目录' }).click();
   hasCommit = true;
   await page.getByRole('button', { name: '刷新文档' }).click();

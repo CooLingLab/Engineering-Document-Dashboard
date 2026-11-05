@@ -1,5 +1,5 @@
 import type { NodeView, WorkflowGraph } from '../domain/project';
-import { statusLabels } from './StageNode';
+import { statusLabels } from '../workflow/statusLabels';
 
 type Props = {
   graph: WorkflowGraph;
